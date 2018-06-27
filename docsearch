@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# This file recursively searches src tree for *.html documentation
+# files, and puts them inside a directory 'doc'
+[ ! -d doc ] && mkdir doc
+# find src/ -name '*.html' -exec cp {} doc/ \;
+find src/ -name '*.html' -exec cp {} doc/ \;

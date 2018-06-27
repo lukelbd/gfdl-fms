@@ -1,0 +1,3 @@
+Note: Throughout the model, modules are refered to as "hs_forcing". =
+Decided it's not really worth refactoring everything to use "pk" for Polvani Kushner.
+Instead, just have this folder with alternative forcing code, but all files/moduels still use "hs".

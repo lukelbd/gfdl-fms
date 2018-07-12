@@ -206,7 +206,7 @@ contains
         if (x .GE. ptab(i1)) goto 60
   30        continue
 !      write(*,*) 'interpol error'
-      write(*,*) x
+!      write(*,*) x
 !      stop
 
 !      if (x .LE. ptab(ilast+1)) then

@@ -36,7 +36,7 @@ use bgrid_vert_mod       , only: vert_grid_type, &
                                  compute_pres_full, compute_pres_half
 use bgrid_halo_mod       , only: update_halo, UWND, VWND, TEMP, &
                                  NORTH, EAST, WEST, SOUTH
-use hs_forcing_mod       , only: hs_forcing_init, hs_forcing
+use forcing_mod       , only: forcing_init, forcing
 
 !-----------------------------------------------------------------------
 
@@ -153,7 +153,7 @@ contains
 
 !----- initialize physics interface -----
 
-    call hs_forcing_init ( atmos_axes, Time )
+    call forcing_init ( atmos_axes, Time )
 
 !   ----- use entire grid as window ? -----
 
@@ -317,7 +317,7 @@ type   (prog_var_type),intent(inout) :: Var_dt
   if (.not.Dynam%Masks%sigma) then
 !------------ eta coordinate -------------------------------------------
 
-      call hs_forcing ( i1, i2, j1, j2, dt_phys, Time ,&
+      call forcing ( i1, i2, j1, j2, dt_phys, Time ,&
                             Hgrid%Tmp%aph(is:ie,js:je)    ,&
                             p_half   ( 1:ix, 1:jx,:)      ,&
                             p_full   ( 1:ix, 1:jx,:)      ,&
@@ -339,7 +339,7 @@ type   (prog_var_type),intent(inout) :: Var_dt
   else
 !------------- sigma coordinate ----------------------------------------
 
-      call hs_forcing ( i1, i2, j1, j2, dt_phys, Time ,&
+      call forcing ( i1, i2, j1, j2, dt_phys, Time ,&
                             Hgrid%Tmp%aph(is:ie,js:je)    ,&
                             p_half   ( 1:ix, 1:jx,:)      ,&
                             p_full   ( 1:ix, 1:jx,:)      ,&

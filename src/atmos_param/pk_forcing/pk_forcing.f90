@@ -1,5 +1,5 @@
 
-module hs_forcing_mod
+module forcing_mod
 
 !-----------------------------------------------------------------------
 
@@ -26,7 +26,7 @@ private
 !-----------------------------------------------------------------------
 !---------- interfaces ------------
 
-   public :: hs_forcing, hs_forcing_init
+   public :: forcing, forcing_init
 
 !-----------------------------------------------------------------------
 !-------------------- namelist -----------------------------------------
@@ -42,8 +42,8 @@ private
    real :: ka = -40. !  negative values are damping time in days
    real :: ks =  -4., kf = -1.
    real :: k_sponge = -2.
-   real :: k_strat  = -40.
-   real :: k_top    = -3.
+   real :: k_strat  = -40. ! TODO implement this (currently not used)
+   real :: k_top    = -3.  ! TODO implement this (not used; perhaps can do linear transition or something)
 
    logical :: do_conserve_energy = .true.
 
@@ -52,7 +52,7 @@ private
 
 !-----------------------------------------------------------------------
 
-   namelist /hs_forcing_nml/  no_forcing, pk_strat, strat_sponge, t_zero, &
+   namelist /forcing_nml/  no_forcing, pk_strat, strat_sponge, t_zero, &
                               t_strat, delh, delv, eps, sigma_b, vtx_edge, &
                               vtx_wid, vtx_gam, P00, p_sponge, p_tropopause, ka, &
                               ks, kf, k_sponge, k_strat, k_top, damp, &
@@ -60,7 +60,7 @@ private
 
 !-----------------------------------------------------------------------
 
-   character(len=128) :: version='$Id: hs_forcing.f90,v 13.0 2006/03/28 21:10:03 fms Exp $'
+   character(len=128) :: version='$Id: forcing.f90,v 13.0 2006/03/28 21:10:03 fms Exp $'
    character(len=128) :: tagname='$Name: latest $'
 
    real :: tka, tks, vkf, vks, tkstr, tktop
@@ -70,7 +70,7 @@ private
               id_tdt_diss, id_diss_heat, id_tstd, &
               id_ttrop
    real    :: missing_value = -1.e10
-   character(len=14) :: mod_name = 'hs_forcing'
+   character(len=14) :: mod_name = 'forcing'
 
    logical :: module_is_initialized = .false.
 
@@ -80,7 +80,7 @@ contains
 
 !#######################################################################
 
- subroutine hs_forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
+ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
                          u, v, t, r, um, vm, tm, rm, udt, vdt, tdt, &
                          rdt, mask, kbot )
 
@@ -110,7 +110,7 @@ contains
 !-----------------------------------------------------------------------
      if (no_forcing) return
 
-     if (.not.module_is_initialized) call error_mesg ('hs_forcing','hs_forcing_init has not been called', FATAL)
+     if (.not.module_is_initialized) call error_mesg ('forcing','forcing_init has not been called', FATAL)
 
 !-----------------------------------------------------------------------
 !     surface pressure
@@ -203,16 +203,16 @@ contains
         call tracer_source_sink ( flux, sink, p_half, rst, rtnd, kbot )
         rdt(:,:,:,1) = rdt(:,:,:,1) + rtnd
       else
-        call error_mesg('hs_forcing','size(rdt,4) not equal to num_tracers', FATAL)
+        call error_mesg('forcing','size(rdt,4) not equal to num_tracers', FATAL)
       endif
 
 !-----------------------------------------------------------------------
 
- end subroutine hs_forcing
+ end subroutine forcing
 
 !#######################################################################
 
- subroutine hs_forcing_init ( axes, Time )
+ subroutine forcing_init ( axes, Time )
 
 !-----------------------------------------------------------------------
 !
@@ -232,8 +232,8 @@ contains
       if (file_exist('input.nml')) then
          unit = open_namelist_file ( )
          ierr=1; do while (ierr /= 0)
-            read  (unit, nml=hs_forcing_nml, iostat=io, end=10)
-            ierr = check_nml_error (io, 'hs_forcing_nml')
+            read  (unit, nml=forcing_nml, iostat=io, end=10)
+            ierr = check_nml_error (io, 'forcing_nml')
          enddo
   10     call close_file (unit)
       endif
@@ -241,7 +241,7 @@ contains
 !     ----- write version info and namelist to log file -----
 
       call write_version_number (version,tagname)
-      if (mpp_pe() == mpp_root_pe()) write (stdlog(),nml=hs_forcing_nml)
+      if (mpp_pe() == mpp_root_pe()) write (stdlog(),nml=forcing_nml)
 
       if (no_forcing) return
 
@@ -305,11 +305,11 @@ contains
 
 !-----------------------------------------------------------------------
 
- end subroutine hs_forcing_init
+ end subroutine forcing_init
 
 !#######################################################################
 
- subroutine hs_forcing_end 
+ subroutine forcing_end 
 
 !-----------------------------------------------------------------------
 !
@@ -319,7 +319,7 @@ contains
 !-----------------------------------------------------------------------
  module_is_initialized = .false.
 
- end subroutine hs_forcing_end
+ end subroutine forcing_end
 
 !#######################################################################
 
@@ -426,7 +426,7 @@ real, intent(in),  dimension(:,:,:), optional :: mask
           tdamp(:,:,k) = tkstr + (tktop-tkstr)/2.0*(1.0 + tanh((logpz(:,:)-50.0)/7.0))
          endwhere
         else
-         call error_mesg ('hs_forcing','Unrecognized damping option', FATAL)
+         call error_mesg ('forcing','Unrecognized damping option', FATAL)
         endif
       enddo
 
@@ -438,7 +438,7 @@ real, intent(in),  dimension(:,:,:), optional :: mask
 !         write(*,*) p_full(1,1,:)
 !         write(*,*) ' '
 !         write(*,*) ps(1,1)
-!         call error_mesg ('hs_forcing','tdamp test', FATAL) 
+!         call error_mesg ('forcing','tdamp test', FATAL) 
 !       endif
 
 !*** note: if the following loop uses vector notation for all indices
@@ -601,4 +601,4 @@ integer :: i,j,k
 
 !#######################################################################
 
-end module hs_forcing_mod
+end module forcing_mod

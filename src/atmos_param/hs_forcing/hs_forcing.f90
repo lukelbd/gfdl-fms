@@ -1,5 +1,5 @@
 
-module hs_forcing_mod
+module forcing_mod
 
 !-----------------------------------------------------------------------
 !! two !! denote Luke Davis edits
@@ -26,7 +26,7 @@ private
 !---------- interfaces ------------
 
   !! these are the submodules
-   public :: hs_forcing, hs_forcing_init
+   public :: forcing, forcing_init
 
 !-----------------------------------------------------------------------
 !-------------------- namelist -----------------------------------------
@@ -51,13 +51,13 @@ private
   !! ...so this re-downloads parameters from the namelist... even though defaults
   !! were also specified above. redundancy? looks like we could just comment
   !! out the line below if we want to return to defaults
-   namelist /hs_forcing_nml/  no_forcing, t_zero, t_strat, delh, delv, eps, &
+   namelist /forcing_nml/  no_forcing, t_zero, t_strat, delh, delv, eps, &
                               sigma_b, ka, ks, kf, do_conserve_energy, &
                               trflux, trsink
 
 !-----------------------------------------------------------------------
 
-   character(len=128) :: version='$Id: hs_forcing.f90,v 13.0 2006/03/28 21:10:03 fms Exp $'
+   character(len=128) :: version='$Id: forcing.f90,v 13.0 2006/03/28 21:10:03 fms Exp $'
    character(len=128) :: tagname='$Name: latest $'
 
    real :: tka, tks, vkf
@@ -66,7 +66,7 @@ private
    integer :: id_teq, id_tdt, id_udt, id_vdt,  &
               id_tdt_diss, id_diss_heat
    real    :: missing_value = -1.e10
-   character(len=14) :: mod_name = 'hs_forcing'
+   character(len=14) :: mod_name = 'forcing'
 
    logical :: module_is_initialized = .false.
 
@@ -77,7 +77,7 @@ contains
 
 !#######################################################################
 
- subroutine hs_forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
+ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
                          u, v, t, r, um, vm, tm, rm, udt, vdt, tdt, rdt,&
                          mask, kbot )
 
@@ -106,7 +106,7 @@ contains
 !-----------------------------------------------------------------------
      if (no_forcing) return
 
-     if (.not.module_is_initialized) call error_mesg ('hs_forcing','hs_forcing_init has not been called', FATAL)
+     if (.not.module_is_initialized) call error_mesg ('forcing','forcing_init has not been called', FATAL)
 
 !-----------------------------------------------------------------------
 !     surface pressure
@@ -190,16 +190,16 @@ contains
         call tracer_source_sink ( flux, sink, p_half, rst, rtnd, kbot )
         rdt(:,:,:,1) = rdt(:,:,:,1) + rtnd
       else
-        call error_mesg('hs_forcing','size(rdt,4) not equal to num_tracers', FATAL)
+        call error_mesg('forcing','size(rdt,4) not equal to num_tracers', FATAL)
       endif
 
 !-----------------------------------------------------------------------
 
- end subroutine hs_forcing
+ end subroutine forcing
 
 !#######################################################################
 
- subroutine hs_forcing_init ( axes, Time )
+ subroutine forcing_init ( axes, Time )
 
 !-----------------------------------------------------------------------
 !
@@ -219,8 +219,8 @@ contains
       if (file_exist('input.nml')) then
          unit = open_namelist_file ( )
          ierr=1; do while (ierr /= 0)
-            read  (unit, nml=hs_forcing_nml, iostat=io, end=10)
-            ierr = check_nml_error (io, 'hs_forcing_nml')
+            read  (unit, nml=forcing_nml, iostat=io, end=10)
+            ierr = check_nml_error (io, 'forcing_nml')
          enddo
   10     call close_file (unit)
       endif
@@ -228,7 +228,7 @@ contains
 !     ----- write version info and namelist to log file -----
 
       call write_version_number (version,tagname)
-      if (mpp_pe() == mpp_root_pe()) write (stdlog(),nml=hs_forcing_nml)
+      if (mpp_pe() == mpp_root_pe()) write (stdlog(),nml=forcing_nml)
 
       if (no_forcing) return
 
@@ -283,11 +283,11 @@ contains
 
 !-----------------------------------------------------------------------
 
- end subroutine hs_forcing_init
+ end subroutine forcing_init
 
 !#######################################################################
 
- subroutine hs_forcing_end 
+ subroutine forcing_end 
 
 !-----------------------------------------------------------------------
 !
@@ -297,7 +297,7 @@ contains
 !-----------------------------------------------------------------------
  module_is_initialized = .false.
 
- end subroutine hs_forcing_end
+ end subroutine forcing_end
 
 !#######################################################################
 
@@ -488,4 +488,4 @@ real    :: vcoeff
 
 !#######################################################################
 
-end module hs_forcing_mod
+end module forcing_mod

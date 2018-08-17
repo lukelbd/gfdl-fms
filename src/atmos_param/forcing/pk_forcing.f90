@@ -65,7 +65,7 @@ namelist /forcing_nml/  no_forcing, strat_damp, strat_mode, strat_sponge, strat_
   t_zero, t_strat, delh, delv, eps, &
   lat_exact, &
   vtx_edge, vtx_wid, vtx_gam, &
-  sigma_b, p_sponge, p_logeval, z_pkswitch, z_kdepth, &
+  exp_b, sigma_b, p_sponge, p_logeval, z_pkswitch, z_kdepth, &
   ktrop, kbl, kfric, ksponge, kstrat, kmeso, &
   trflux, trsink, &
   do_conserve_energy

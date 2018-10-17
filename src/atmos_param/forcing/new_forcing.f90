@@ -619,7 +619,7 @@ do k=1,size(t,3)
       tdamp(:,:,k,2) = 0.0
       exit ! i.e. break from top-level do loop
     else if (l==1) then
-      ! Damp the mean
+      ! Damp the mean (first dimension is longitudes)
       t_mean(:) = sum(t(:,:,k),1)/size(t,1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_mean(:)
@@ -627,7 +627,7 @@ do k=1,size(t,3)
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t_decomp(:,:,1) - teq(:,:,k))
     else if (l==2) then
       ! Damp the anomaly
-      t_decomp(:,:,2) = t(:,:,k) - t_decomp(:,:,1) ! anomaly
+      t_decomp(:,:,2) = t(:,:,k) - t_decomp(:,:,1) ! anomaly relative to mean
       tdt(:,:,k,2) = -tdamp(:,:,k,2)*t_decomp(:,:,2)
     endif
   enddo

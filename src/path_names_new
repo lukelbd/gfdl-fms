@@ -1,4 +1,4 @@
-atmos_param/forcing/da_forcing.f90
+atmos_param/forcing/new_forcing.f90
 atmos_param/forcing/us_tstd.f90
 atmos_shared/vert_advection/vert_advection.f90
 atmos_solo/atmos_model.f90

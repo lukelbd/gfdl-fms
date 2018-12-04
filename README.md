@@ -8,17 +8,14 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 ## Namelist `input.nml`
 1. `&main_nml`:
 
-| --- | --- | --- |
 | Parameter | Default value | Description |
 | --- | --- | --- |
 | `days`         | `0` | days to run |
 | `dt_atmos`     | `600` | integration time step in seconds |
 | `current_time` | `0` | for changing current time relative to base time
-| --- | --- | --- |
 
 1. `&spectral_dynamics_nml`
 
-| --- | --- | --- |
 | Parameter | Default value | Description |
 | --- | --- | --- |
 | `damping_option`       | `'resolution_dependent'` | diffusion option |
@@ -43,7 +40,6 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `topography_option`      | `'flat'` | `'flat'` for no topography, `'input'` to use a netCDF in the `INPUT` directory |
 | `vert_coord_option`      | `'even_sigma'` | `'input'` to use the `&vert_coordinate_nml`, `pk_sigma` for Polvani and Kushner (2002) style level spacing, `even_sigma` for simple, evenly spaced sigma coordinates, and a few other options |
 | `valid_range_t` | `100.0, 500.0` | temperature range outside which we consider model to have "blown up" |
-| --- | --- | --- |
 
 1. Forcing namelist
 Empty namelist = values take on default; described in:

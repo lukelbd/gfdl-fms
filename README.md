@@ -2,7 +2,7 @@
 
 See the file [doc.pdf](https://github.com/lukelbd/gfdl-drycore/master/blob/doc.pdf) for more information.
 
-Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/master/blob/forcing_default.nml).
+Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml).
 
 # Model Documentation
 ## Namelist Parameter Information

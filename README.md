@@ -73,7 +73,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
   1. Experiment title
   1. Base date for netCDF output (default, 0000-00-00 00:00:00)
 
-### Ouput file line (6 comma-separated value)
+### Ouput file line (6 comma-separated values)
 
   1. File name string
   1. Output frequency, one of the following:

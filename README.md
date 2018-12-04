@@ -43,21 +43,20 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 ### `&forcing_nml`
 
-Empty namelist = values take on default; described in:
-Held, I. M., and M. J. Suarez, 1994: A proposal for the intercomparison
-of the dynamical cores of atmospheric general circulation models.
-  * `t_zero`: temp of equator at surface; rest of Teq determined from this, plus some lapse rate
-  * `t_strat`: strat temp, a constant; might write in some extra fortran to make it variable with height
-  * `delh`: total TE contrast, equator-to-pole
-  * `delv`: controls static stability (vertical gradient) of Te
-  * `eps`: applies extra `Teq-->Teq+sin(lat)*eps` gradient (so eps=10 increases gradient by 10K SH, reduces in NH)
-  * `sigma_b`: tropopause, where forcing different above, sigma coord
-  * `ka`: atmospheric tau
-  * `ks`: boundary layer tau
-  * `kf`: Rayleigh damping
-  * `do_conserve_energy`: energy conservation
-  * `trflux`: surface flux for tracer (if tracer requested)
-  * `trsink`: damping time for tracer (if tracer requested)
+| Parameter | Default value | Description |
+| --- | --- | --- |
+| `t_zero`              | Temp of equator at surface; rest of Teq determined from this, plus some lapse rate
+| `t_strat`             | Strat temp, a constant; might write in some extra fortran to make it variable with height
+| `delh`                | Total TE contrast, equator-to-pole
+| `delv`                | Controls static stability (vertical gradient) of Te
+| `eps`                 | Applies extra `Teq-->Teq+sin(lat)*eps` gradient (so eps=10 increases gradient by 10K SH, reduces in NH)
+| `sigma_b`             | Tropopause, where forcing different above, sigma coord
+| `ka`                  | Atmospheric tau
+| `ks`                  | Boundary layer tau
+| `kf`                  | Rayleigh damping
+| `do_conserve_energy`  | Energy conservation
+| `trflux`              | Surface flux for tracer (if tracer requested)
+| `trsink`              | Damping time for tracer (if tracer requested)
 
 ### `&fms_nml`
 

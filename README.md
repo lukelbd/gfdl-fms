@@ -71,31 +71,31 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 ### Header line
 2 lines go here:
 
-  0. Experiment title
-  0. Base date for netCDF output (default, 0000-00-00 00:00:00)
+  1. Experiment title
+  1. Base date for netCDF output (default, 0000-00-00 00:00:00)
 
 ### Ouput files line
 6 comma-separated values:
 
-  0. File name string
-  0. Output frequency, one of the following:
+  1. File name string
+  1. Output frequency, one of the following:
     * >0 = output frequency in units `"units"`
     * 0 = output at every timestep
     * -1 = output at the end of run
-  0. Output frequency units: use `"years"`, `"months"`, `"days"`, `"minutes"`, `"hours"`, `"seconds"`
-  0. Format: use `1` for NetCDF (the **only** supported format... not sure why it has a column)
-  0. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`
-  0. Time axis name: name for time axis on output NetCDF, default `"time"`
+  1. Output frequency units: use `"years"`, `"months"`, `"days"`, `"minutes"`, `"hours"`, `"seconds"`
+  1. Format: use `1` for NetCDF (the **only** supported format... not sure why it has a column)
+  1. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`
+  1. Time axis name: name for time axis on output NetCDF, default `"time"`
 
 ### Diagnostic fields
 8 comma-separated values:
 
-  0. Module name that can export these parameter names (e.g. `"dynamics"` or `"forcing"`)
-  0. Fortran parameter name 
-  0. Output parameter name
-  0. File name string
-  0. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
-  0. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`
-  0. Other options: not implemented... use the dummy string `"none"`
-  0. Packing value: `1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer
+  1. Module name that can export these parameter names (e.g. `"dynamics"` or `"forcing"`)
+  1. Fortran parameter name 
+  1. Output parameter name
+  1. File name string
+  1. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
+  1. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`
+  1. Other options: not implemented... use the dummy string `"none"`
+  1. Packing value: `1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer
 

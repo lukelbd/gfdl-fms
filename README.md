@@ -71,7 +71,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 ### Header lines
 
   1. Experiment title
-  1. Base date for netCDF output (default, 0000-00-00 00:00:00)
+  1. Base date for netCDF output; default is `0000-00-00 00:00:00`)
 
 ### Ouput file line (6 comma-separated values)
 

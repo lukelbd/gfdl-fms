@@ -68,14 +68,12 @@ of the dynamical cores of atmospheric general circulation models.
 ## Diagnostic table `diag_table`
 Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
 
-### Header line
-2 lines go here:
+### Header lines
 
   1. Experiment title
   1. Base date for netCDF output (default, 0000-00-00 00:00:00)
 
-### Ouput files line
-6 comma-separated values:
+### Ouput file line (6 comma-separated value)
 
   1. File name string
   1. Output frequency, one of the following:
@@ -87,8 +85,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
   1. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`
   1. Time axis name: name for time axis on output NetCDF, default `"time"`
 
-### Diagnostic fields
-8 comma-separated values:
+### Diagnostic field line (8 comma-separated values)
 
   1. Module name that can export these parameter names (e.g. `"dynamics"` or `"forcing"`)
   1. Fortran parameter name 

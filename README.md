@@ -41,7 +41,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `vert_coord_option`      | `'even_sigma'` | `'input'` to use the `&vert_coordinate_nml`, `pk_sigma` for Polvani and Kushner (2002) style level spacing, `even_sigma` for simple, evenly spaced sigma coordinates, and a few other options |
 | `valid_range_t` | `100.0, 500.0` | temperature range outside which we consider model to have "blown up" |
 
-### Forcing namelist
+### `&forcing_nml`
 
 Empty namelist = values take on default; described in:
 Held, I. M., and M. J. Suarez, 1994: A proposal for the intercomparison

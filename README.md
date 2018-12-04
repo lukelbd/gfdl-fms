@@ -88,8 +88,8 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 ### Diagnostic field line (8 comma-separated values)
 
   1. Module name that can export this parameter name (e.g. `"dynamics"` or `"forcing"`)
-  1. Fortran parameter name 
-  1. Output parameter name
+  1. Fortran module parameter name 
+  1. Parameter name for NetCDF file
   1. File name string
   1. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
   1. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`

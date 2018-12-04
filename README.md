@@ -6,33 +6,42 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 # Model Documentation
 ## Namelist `input.nml`
-1. Main namelist:
-  * `days`: days to run for
-  * `dt_atmos`: time-step for integration
-  * `current_time`: for changing current time relative to base time (although does RESTART do that?)
+1. `&main_nml`:
+  | --- | --- | --- |
+  | Parameter | Default value | Description |
+  | --- | --- | --- |
+  | `days`         | `0` | days to run |
+  | `dt_atmos`     | `600` | integration time step in seconds |
+  | `current_time` | `0` | for changing current time relative to base time
+  | --- | --- | --- |
 
-1. Spectral dynamics namelist
-  * `damping_option`: default, leave alone
-  * `damping_order`: 4 = ∇8 diffusion; leave at that
-  * `damping_coeff`: default, leave alone
-  * `do_mass_correction`: prevent changing mean surface pressure (default true)
-  * `do_energy_correction`: prevent changing total KE+PE (default true)
-  * `do_water_correction`: prevent changes to global mean water vapor (default true, set false)
-  * `use_virtual_temperature`: consider moisture in computation of geopotential (default false)
-  * `vert_advect_uv`: default, leave alone
-  * `vert_advect_t`: default, leave alone
-  * `longitude_origin`: use 0
-  * `robert_coeff`: default, leave alone (has to do with time-integration scheme)
-  * `alpha_implicit`: implicit gravity wave scheme; .5 = centered, 1 = backward (default .5)
-  * `lon_max`: lons for gridding spectral results
-  * `lat_max`: lats for gridding spectral results
-  * `num_levels`: vertical level count
-  * `num_fourier`: this is TRUNCATION LEVEL
-  * `num_spherical`: should be `num_fourier+1`
-  * `fourier_inc`: number of 'sectors'; can divide up spectral model
-  * `triang_trun`: as opposed to rhomboidal
-  * `topography_option`: 'flat' for zero, 'input' to use a netCDF in INPUT directory
-  * `vert_coord_option`: 'input' for input, else... dunno
+1. `&spectral_dynamics_nml`
+  | --- | --- | --- |
+  | Parameter | Default value | Description |
+  | --- | --- | --- |
+  | `damping_option`       | `'resolution_dependent'` | diffusion option |
+  | `damping_order`          | `4` | corresponds to ∇8 diffusion |
+  | `damping_coeff`          | `1.15741e-4` | diffusion strength |
+  | `do_mass_correction`     | `.true.` | prevent changing mean surface pressure? |
+  | `do_energy_correction`   | `.true.` | prevent changing total kinetic and potential energy? |
+  | `do_water_correction`    | `.true.` | prevent changing atmospheric water vapor? (for aquaplanet) |
+  | `use_virtual_temperature` | `.true.` | consider moisture in computation of geopotential? (for aquaplanet) |
+  | `vert_advect_uv`         | `'second_centered'` | vertical advection scheme for horizontal wind |
+  | `vert_advect_t`          | `'second_centered'` | vertical advection scheme for temperature |
+  | `longitude_origin`       | `0` | |
+  | `robert_coeff`           | `0.04` | has to do with time-integration scheme |
+  | `alpha_implicit`         | `0.5` | implicit gravity wave scheme -- `0.5` is centered, `1` is backward |
+  | `lon_max`                | `128` | number of longitudes (should be consistent with truncation number) |
+  | `lat_max`                | `64` | number of latitudes (should be consistent with truncation number) |
+  | `num_levels`             | `40` | number of vertical levels |
+  | `num_fourier`            | `42` | truncation number |
+  | `num_spherical`          | `43` | should generally equal `num_fourier + 1` |
+  | `fourier_inc`            | `1` | number of 'sectors' for dividing up spectral model |
+  | `triang_trun`            | `.true.` | triangular truncation, or rhomboidal? |
+  | `topography_option`      | `'flat'` | `'flat'` for no topography, `'input'` to use a netCDF in the `INPUT` directory |
+  | `vert_coord_option`      | `'even_sigma'` | `'input'` to use the `&vert_coordinate_nml`, `pk_sigma` for Polvani and Kushner (2002) style level spacing, `even_sigma` for simple, evenly spaced sigma coordinates, and a few other options |
+  | `valid_range_t` | `100.0, 500.0` | temperature range outside which we consider model to have "blown up" |
+  | --- | --- | --- |
 
 1. Forcing namelist
 Empty namelist = values take on default; described in:

@@ -43,20 +43,40 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 ### `&forcing_nml`
 
-| Parameter | Default value | Description |
-| --- | --- | --- |
-| `t_zero`              | Temp of equator at surface; rest of Teq determined from this, plus some lapse rate
-| `t_strat`             | Strat temp, a constant; might write in some extra fortran to make it variable with height
-| `delh`                | Total TE contrast, equator-to-pole
-| `delv`                | Controls static stability (vertical gradient) of Te
-| `eps`                 | Applies extra `Teq-->Teq+sin(lat)*eps` gradient (so eps=10 increases gradient by 10K SH, reduces in NH)
-| `sigma_b`             | Tropopause, where forcing different above, sigma coord
-| `ka`                  | Atmospheric tau
-| `ks`                  | Boundary layer tau
-| `kf`                  | Rayleigh damping
-| `do_conserve_energy`  | Energy conservation
-| `trflux`              | Surface flux for tracer (if tracer requested)
-| `trsink`              | Damping time for tracer (if tracer requested)
+**Note for all damping parameters, positive value means seconds, negative means days, and zero means off (no damping).**
+
+| Parameter | Default value | Applicable stratosphere mode | Description |
+| --- | --- | --- | --- | 
+| `no_forcing`   | `.false.`    | all        | Turn off forcing altogether (same as setting each 'k' to zero)
+| `ndamp_decomp` | `.true.`     | all        | Separate zonal mean/anomaly components of damping?
+| `rdamp_decomp` | `.false.`    | all        | Apply frictional damping separately for mean and anomaly components?
+| `strat_vtx`    | `.true.`     | `pk`, `da` | Apply polar vortex?
+| `strat_sponge` | `.true.`     | `pk`, `da` | Toggle sponge layer above 1hPa?
+| `strat_mode`   | `'hs'`       | all        | One of `'hs'`, `'pk'`, or `'da'`
+| `strat_damp`   | `'constant'` | `da`       | One of `'constant'` or `'linear'`
+| `t_zero`       | `315`        | all        | Equilibrium temperature of the equator at the surface
+| `t_strat`      | `200`        | all        | Minimum equilibrium temperature in summer stratosphere
+| `delh`         | `60`         | all        | Surface equator-pole difference in equilibrium temperature
+| `delv`         | `10`         | all        | Controls static stability (vertical gradient) of Te
+| `eps`          | `0`          | all        | Applies extra `Teq-->Teq+sin(lat)*eps` gradient (so eps=10 increases gradient by 10K SH, reduces in NH)
+| `sigma_b`      | `0.7`        | all        | Top of "boundary layer" in sigma coordinates
+| `z_pkswitch`   | `16`         | `pk`       | Height (in km) above which `pk` stratosphere is applied
+| `z_kdepth`     | `5`          | `da`       | Depth (in km) of transition region between `ktrop` and `kstrat`
+| `lat_trop_ref` | `0`          | `da`       | Latitude to which the U.S. standard atmosphere heights correspond exactly; heights will be perturbed to follow the equilibrium tropopause at other latitudes         |
+| `p_sponge`     | `1.0`        | `pk`, `da` | Level (in hPa) above which sponge layer applies
+| `p_logeval`    | `200`        | `da`       | Pressure at which we evaluate the logarithm in the `hs` equation for equilibrium temperature, in order to solve for the "equilibrium tropopause" height analytically
+| `vtx_edge`     | `50`         | `pk`, `da` | "Edge" of the polar vortex, in degrees latitude
+| `vtx_wid`      | `20`         | `pk`, `da` | "Width" of the polar vortex-to-U.S. standard atmosphere stratosphere transition region
+| `vtx_gam`      | `2`          | `pk`, `da` | Lapse rate (in K/km) of polar vortex
+| `ksponge`      | `-0.5`       | `pk`, `da` | Maximum mechanical damping rate for winds in sponge layer, realized at the top of the model atmosphere
+| `ktrop`        | `-40`        | all        | Free-troposphere thermal damping timescale
+| `kstrat`       | `-20`        | all        | Lower stratosphere thermal damping timescale, or constant damping timescale for `hs` stratosphere
+| `kmeso`        | `-4`         | `pk`, `da` | Upper-stratosphere thermal damping timescale
+| `kbl`                | `-10`    | all | Maximum boundary layer damping timescale, realized at the surface on the equator
+| `kf`                 | `-1`     | all | Maximum mechanical (friction) damping of winds in the boundary layer, realized at the surface
+| `do_conserve_energy` | `.true.` | all | Whether to increase thermal energy in response to kinetic energy lost to dissipation of the winds
+| `trflux`             | `1.e-5`  | all | Surface flux for tracer, if tracers were registered
+| `trsink`             | `-4`     | all | Damping timescale for tracer, if tracers were registered
 
 ### `&fms_nml`
 

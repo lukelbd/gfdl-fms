@@ -11,6 +11,7 @@ jer = [0.000e+00, 1.895e-05, 4.715e-05, 1.019e-04, 1.987e-04, 3.581e-04, 6.064e-
 3.185e-01, 3.666e-01, 4.205e-01, 4.805e-01, 5.471e-01, 6.209e-01, 7.025e-01, 7.925e-01,
 8.914e-01, 1.000e+00][::-1] # reverse
 jer = [1000*j for j in jer]
+
 # Solve for pk equation
 # If want 40 levels, we want the boundary sigma 0 and then 40 boundaries higher than sigma 10^-5
 # where boundaries are spaced by equation (i/N)**5 for some N.
@@ -31,11 +32,13 @@ def pk_levels(N, exp1=-5, exp2=5): # input is number of full-width levels
 pk = pk_levels(40)
 for j,p in zip(jer,pk):
     print(f'{j:.5f} : {p:.5f}')
+
 # Show levels with different spacing
 print('60 levels')
 print(' '.join(f'{p:.5f}' for p in pk_levels(60)))
 print('80 levels')
 print(' '.join(f'{p:.5f}' for p in pk_levels(80)))
+
 # Next consider equal spacing in pseudoheight coordinates
 # Why to avoid this? Because results in even ***more*** skewing toward
 # upper levels than the i**5 idea

@@ -6,7 +6,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 # Model Documentation
 ## Namelist `input.nml`
-1. `&main_nml`:
+### `&main_nml`
 
 | Parameter | Default value | Description |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `dt_atmos`     | `600` | integration time step in seconds |
 | `current_time` | `0` | for changing current time relative to base time
 
-1. `&spectral_dynamics_nml`
+### `&spectral_dynamics_nml`
 
 | Parameter | Default value | Description |
 | --- | --- | --- |
@@ -41,7 +41,8 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `vert_coord_option`      | `'even_sigma'` | `'input'` to use the `&vert_coordinate_nml`, `pk_sigma` for Polvani and Kushner (2002) style level spacing, `even_sigma` for simple, evenly spaced sigma coordinates, and a few other options |
 | `valid_range_t` | `100.0, 500.0` | temperature range outside which we consider model to have "blown up" |
 
-1. Forcing namelist
+### Forcing namelist
+
 Empty namelist = values take on default; described in:
 Held, I. M., and M. J. Suarez, 1994: A proposal for the intercomparison
 of the dynamical cores of atmospheric general circulation models.
@@ -58,14 +59,15 @@ of the dynamical cores of atmospheric general circulation models.
   * `trflux`: surface flux for tracer (if tracer requested)
   * `trsink`: damping time for tracer (if tracer requested)
 
-1. Miscellaneous stuff
-  * `domains_stack_size` will vary for different model resolutions, domain decompositions, and
-   number of processors used. Quote from documentation:
+### `&fms_nml`
 
-"If you increase the model resolution or are running on a small number of processors,
+| Parameter | Default value | Description |
+| --- | --- | --- |
+| `domains_stack_size` | 8000000 | Necessary value varies for different model resolutions, domain decompositions, and
+  number of processors used. Quote from documentation: "If you increase the model resolution or are running on a small number of processors,
  you may get the error message `MPP_UPDATE_DOMAINS user stack overflow`. In this case,
  increase the domain stack size found in the core-specific namelist files. The new stack
- size should be greater than or equal to the number printed in the error message."
+ size should be greater than or equal to the number printed in the error message." |
 
 ## Diagnostic table `diag_table`
 Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.

@@ -5,7 +5,12 @@ See the file [doc.pdf](https://github.com/lukelbd/gfdl-drycore/master/blob/doc.p
 Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml).
 
 # Model Documentation
-## Namelist Parameter Information
+## Namelist `input.nml`
+1. Main namelist:
+  * `days`: days to run for
+  * `dt_atmos`: time-step for integration
+  * `current_time`: for changing current time relative to base time (although does RESTART do that?)
+
 1. Spectral dynamics namelist
   * `damping_option`: default, leave alone
   * `damping_order`: 4 = $\nabla$8 diffusion; leave at that
@@ -28,7 +33,8 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
   * `triang_trun`: as opposed to rhomboidal
   * `topography_option`: 'flat' for zero, 'input' to use a netCDF in INPUT directory
   * `vert_coord_option`: 'input' for input, else... dunno
-2. Forcing namelist
+
+1. Forcing namelist
 Empty namelist = values take on default; described in:
 Held, I. M., and M. J. Suarez, 1994: A proposal for the intercomparison
 of the dynamical cores of atmospheric general circulation models.
@@ -44,11 +50,8 @@ of the dynamical cores of atmospheric general circulation models.
   * `do_conserve_energy`: energy conservation
   * `trflux`: surface flux for tracer (if tracer requested)
   * `trsink`: damping time for tracer (if tracer requested)
-3. Main namelist:
-  * `days`: days to run for
-  * `dt_atmos`: time-step for integration
-  * `current_time`: for changing current time relative to base time (although does RESTART do that?)
-4. Miscellaneous stuff
+
+1. Miscellaneous stuff
   * `domains_stack_size` will vary for different model resolutions, domain decompositions, and
    number of processors used. Quote from documentation:
 
@@ -57,11 +60,11 @@ of the dynamical cores of atmospheric general circulation models.
  increase the domain stack size found in the core-specific namelist files. The new stack
  size should be greater than or equal to the number printed in the error message."
 
-## Diagnostic Table Information
-* Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections".
-* Note that **strings** must be in double quotes.
+## Diagnostic table `diag_table`
+Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
 1. **Header**: 2 lines: (1) Experiment title and (2) base date for netCDF output (default, 0000-00-00 00:00:00)
-2. **Output Files**: 6 comma-separated values: (1) file name string, (2) output frequency, (3) output frequency units, (4) file format, (5) time units, and (6) `long_name` for time axis
+
+1. **Output Files**: 6 comma-separated values: (1) file name string, (2) output frequency, (3) output frequency units, (4) file format, (5) time units, and (6) `long_name` for time axis
   * `output frequency`:
         >0 = output frequency in units 'units'
          0 = output at every timestep
@@ -69,7 +72,8 @@ of the dynamical cores of atmospheric general circulation models.
   * `frequency units`: use years, months, days, minutes, hours, seconds
   * `format`: 1 = netCDF (the **only** supported format... so, not sure why it has a column)
   * `time units`: time axis for output NetCDF, use days, minutes, hours, seconds
-3. **Diagnostic field**: 8 comma-separated values: (1) module name that can export these param-names, (2) module param-name (see below), (3) output param-name, (4) file name string, (5) time sampling for getting the averages (currently, only support averaging over ALL time steps of model run), (6) whether we take time average as FORTRAN boolean `.true.`/`.false.` (must match file settings), (7) other options (not implemented; use dummy string `"none"`), (8) and packing value (`1`=double [64], `2`=float [32] (best for most applications), `4`=16-bit integer)
+
+1. **Diagnostic field**: 8 comma-separated values: (1) module name that can export these param-names, (2) module param-name (see below), (3) output param-name, (4) file name string, (5) time sampling for getting the averages (currently, only support averaging over ALL time steps of model run), (6) whether we take time average as FORTRAN boolean `.true.`/`.false.` (must match file settings), (7) other options (not implemented; use dummy string `"none"`), (8) and packing value (`1`=double [64], `2`=float [32] (best for most applications), `4`=16-bit integer)
   * `temp`: temperature
   * `ps`: surface pressure
   * `pk`: pressure on each height level

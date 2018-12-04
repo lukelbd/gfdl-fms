@@ -13,7 +13,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 1. Spectral dynamics namelist
   * `damping_option`: default, leave alone
-  * `damping_order`: 4 = $\nabla$8 diffusion; leave at that
+  * `damping_order`: 4 = ∇8 diffusion; leave at that
   * `damping_coeff`: default, leave alone
   * `do_mass_correction`: prevent changing mean surface pressure (default true)
   * `do_energy_correction`: prevent changing total KE+PE (default true)
@@ -73,7 +73,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
   * `format`: 1 = netCDF (the **only** supported format... so, not sure why it has a column)
   * `time units`: time axis for output NetCDF, use days, minutes, hours, seconds
 
-1. **Diagnostic field**: 8 comma-separated values: (1) module name that can export these param-names, (2) module param-name (see below), (3) output param-name, (4) file name string, (5) time sampling for getting the averages (currently, only support averaging over ALL time steps of model run), (6) whether we take time average as FORTRAN boolean `.true.`/`.false.` (must match file settings), (7) other options (not implemented; use dummy string `"none"`), (8) and packing value (`1`=double [64], `2`=float [32] (best for most applications), `4`=16-bit integer)
+1. **Diagnostic field**: 8 comma-separated values: (1) module name that can export these parameter-names, (2) module parameter-name (see below), (3) output param-name, (4) file name string, (5) time sampling for getting the averages (currently, only support averaging over ALL time steps of model run), (6) whether we take time average as FORTRAN boolean `.true.`/`.false.` (must match file settings), (7) other options (not implemented; use dummy string `"none"`), (8) and packing value (`1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer)
   * `temp`: temperature
   * `ps`: surface pressure
   * `pk`: pressure on each height level

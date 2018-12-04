@@ -64,10 +64,7 @@ of the dynamical cores of atmospheric general circulation models.
 | Parameter | Default value | Description |
 | --- | --- | --- |
 | `domains_stack_size` | 8000000 | Necessary value varies for different model resolutions, domain decompositions, and
-  number of processors used. Quote from documentation: "If you increase the model resolution or are running on a small number of processors,
- you may get the error message `MPP_UPDATE_DOMAINS user stack overflow`. In this case,
- increase the domain stack size found in the core-specific namelist files. The new stack
- size should be greater than or equal to the number printed in the error message." |
+ number of processors used. Quote from documentation: "If you increase the model resolution or are running on a small number of processors, you may get the error message `MPP_UPDATE_DOMAINS user stack overflow`. In this case, increase the domain stack size found in the core-specific namelist files. The new stack size should be greater than or equal to the number printed in the error message." |
 
 ## Diagnostic table `diag_table`
 Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.

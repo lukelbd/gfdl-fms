@@ -56,9 +56,9 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `strat_damp`   | `'constant'` | `da`       | One of `'constant'` or `'linear'`
 | `t_zero`       | `315`        | all        | Equilibrium temperature of the equator at the surface
 | `t_strat`      | `200`        | all        | Minimum equilibrium temperature in summer stratosphere
-| `delh`         | `60`         | all        | Surface equator-pole difference in equilibrium temperature
+| `delh`         | `60`         | all        | Equator-pole difference in surface equilibrium temperature
 | `delv`         | `10`         | all        | Controls static stability (vertical gradient) of Te
-| `eps`          | `0`          | all        | Applies seasonality, where positive `N` reduces the equator-pole difference in equilibrium temperature by `N` Kelvin in the northern hemisphere, and increases it by that much in the southern hemisphere
+| `eps`          | `0`          | all        | Applies seasonality, where positive `N` reduces the equator-pole difference in surface equilibrium temperature by `N` Kelvin in the northern hemisphere, and increases it by that much in the southern hemisphere
 | `sigma_b`      | `0.7`        | all        | Top of "boundary layer" in sigma coordinates
 | `z_pkswitch`   | `16`         | `pk`       | Height (in km) above which `pk` stratosphere is applied
 | `z_kdepth`     | `5`          | `da`       | Depth (in km) of transition region between `ktrop` and `kstrat`

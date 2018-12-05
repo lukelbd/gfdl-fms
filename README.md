@@ -74,7 +74,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 
 ### `&forcing_nml`
 
-Note for all damping parameters, a positive value means seconds, negative means days, and zero means off (no damping). To apply damping to mean and anomaly components separately, make sure `ndamp_decomp` and/or `rdamp_decomp` are set to `.true.`, and specify in the namelist e.g. `ktrop = -40, 0` for the mean and anomaly components, respectively.
+Note for all damping parameters, a positive value means seconds, negative means days, and zero means off (no damping). To apply damping to mean and anomaly components separately, make sure `ndamp_decomp` and/or `rdamp_decomp` are set to `.true.`, and specify in the namelist e.g. `ktrop = -40, 0` to set the mean and anomaly components, respectively (this syntax indicates you are passing a length-2 array).
 
 | Parameter | Default value | Applicable stratosphere mode | Description |
 | --- | --- | --- | --- | 

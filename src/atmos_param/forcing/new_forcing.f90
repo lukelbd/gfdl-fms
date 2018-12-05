@@ -571,11 +571,12 @@ do k=1,size(t,3)
       ! tkhi(:,:) = tkstrat + (1.0 + tanh((z_full(:,:)-35.0)/7.0))*(tkmeso-tkstrat)/2.0
       ! Say the polar tropopause height is 5km below equatorial one
       ! Then using e^(-z/H) the pressure depth of transition region is half as big at equator, which makes sense
+      ! If loops not allowed inside where loop, so do it here
       if (trim(strat_damp) == 'constant') then ! *constant* above tropopause region
         tkhi_decomp(:,:,l) = tkstrat(l)
       else if (trim(strat_damp) == 'linear') then ! *linear* above tropopause region, relaxing from kstrat to faster kmeso
         tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkmeso(l) - (tkmeso(l)-tkstrat(l))*(50-z_full(:,:))/(50-z_pkswitch-z_kdepth))
+          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full(:,:)-z_pkswitch-z_kdepth)/(50-z_pkswitch-z_kdepth))
       else
         call error_mesg ('forcing','Unrecognized damping option "' // strat_damp // '"', FATAL)
       endif
@@ -592,11 +593,12 @@ do k=1,size(t,3)
     else if (trim(strat_mode) == 'da') then
       !     ----- Davis et al. -----
       ! Again, conforms to tropopause
+      ! If loops not allowed inside where loop, so do it here
       if (trim(strat_damp) == 'constant') then ! *constant* above tropopause region
         tkhi_decomp(:,:,l) = tkstrat(l)
       else if (trim(strat_damp) == 'linear') then ! *linear* above tropopause region, relaxing from kstrat to faster kmeso
         tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkmeso(l) - (tkmeso(l)-tkstrat(l))*(50-z_full(:,:))/(50-z_trop(:,:)-z_kdepth))
+          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full(:,:)-z_trop(:,:)-z_kdepth)/(50-z_trop(:,:)-z_kdepth))
       else
         call error_mesg ('forcing','Unrecognized damping option "' // strat_damp // '"', FATAL)
       endif

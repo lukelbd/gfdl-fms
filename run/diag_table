@@ -1,0 +1,27 @@
+"Model results from the Held-Suarez benchmark"
+0 0 0 0 0 0
+# (Above is the experiment name and base time for NetCDF time dimension.)
+# Filenames, 6 fields each:
+# 1) name
+# 2) save-frequency (-1==at end, 0==all, >0==units)
+# 3) save-frequency units 
+# 4) format (1 = netCDF, only supported format)
+# 5) save-time dimension units
+# 6) save-time dimension name
+"4xdaily_inst",  6,   "hours",  1,  "days",  "time",
+# Variables to save, 8 fields each:
+# 1) module name
+# 2) fortran name
+# 3) save name
+# 4) file name
+# 5) time-sampling freq for averages
+# 6) whether we take average
+# 7) other options (currently unavailable)
+# 8) save dtype (currently float32)
+# Note: cannot save time-average data in same file as non-time-average data
+"dynamics",   "temp",      "t",     "4xdaily_inst", "all", .false., "none", 2,
+"dynamics",   "ucomp",     "u",     "4xdaily_inst", "all", .false., "none", 2,
+"dynamics",   "vcomp",     "v",     "4xdaily_inst", "all", .false., "none", 2,
+"dynamics",   "height",    "z",     "4xdaily_inst", "all", .false., "none", 2,
+"dynamics",   "slp",       "slp",   "4xdaily_inst", "all", .false., "none", 2,
+"dynamics",   "omega",     "omega", "4xdaily_inst", "all", .false., "none", 2,

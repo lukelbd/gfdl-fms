@@ -1,0 +1,139 @@
+#!/bin/bash
+# This file runs the spectral GFDL model.
+# Note README.md file has instructions on namelist/diagnostic table.
+ulimit -s unlimited # set max open files
+
+# Parameters for running model
+TSTART=0    # initial day
+TEND=1200   # number of days to run model
+CORES=8     # number of cores for running model
+DT=600      # time step in seconds
+DAYS=100    # days
+EXPNAME=hs  # input file and diag table will be in format input_$EXPNAME.nml
+EXPDIR=test # experiment directory, where dXXXX-dYYYY folders will be generated
+
+# Storage information
+hostname=${HOSTNAME%%.*} # monde is monde.atmos.colostate.edu
+if [ "$hostname" == "monde" ]; then
+  mpirun=/usr/lib64/mpich/bin/mpirun
+  scratch=/mdata1/ldavis
+else
+  echo "Error: Unknown host, must configure library and binary locations before running."
+  exit 1
+fi
+
+# Executable check
+fms=$PWD/${EXPNAME}_${hostname}/fms.x # model executable
+mppnccombine=$PWD/mppnccombine # exe for combining parallel-generated files
+basedir=$scratch/$EXPDIR # helper
+[ ! -r input_${EXPNAME}.nml ] && echo "Error: Namelist \"input_${EXPNAME}.nml\" not found." && exit 1
+[ ! -d $basedir ] && mkdir $basedir # make directory
+[ ! -d $basedir/netcdf ] && mkdir $basedir/netcdf # for storing output
+[ ! -x $fms ] && echo "Error: \"$fms\" is missing, or you don't have execute permissions."
+
+################################################################################
+# Function for creating new model run directory
+function Setup() {
+  # Set up working directory, and move there
+  cdir=$1
+  if [ -d $cdir ]; then
+    echo "Working directory ${cdir##*/} already exists. Deleting..."
+    rm -r $cdir
+  fi
+  mkdir $cdir # make directory
+  touch $cdir/field_table # just create empty file, if want no tracers
+  cp $fms $cdir/fms.x # copy executable
+  cp input_${expname}.nml $cdir/input.nml # copy namelist
+  cp diag_table $cdir/diag_table # copy diag table
+  mkdir $cdir/RESTART # model spits out stuff here, can be accepted as input to new iteration
+  mkdir $cdir/INPUT   # model reads from this
+  [ -r $cdir/topography.data.nc ] && cp topography.data.nc $cdir/INPUT/topography.data.nc
+  cd $cdir
+  # Add to namelist file
+  cat >> input.nml << EOF
+&main_nml
+dt_atmos = $DT,
+days     = $DAYS,
+EOF
+}
+
+################################################################################
+# Function for restarting model
+# Takes one argument: directory where restart files exist
+function Restart() {
+  rdir=$1 # the restart direcotry
+  [ ! -d $rdir ] && echo "Error: Restart directory $rdir does not exist." && exit 1
+  # Copy over relevant restart files for exp type; if missing, raise error
+  if [ -z $1 ]; then
+    echo "Error: Not enough arguments provided to Restart() function."
+    exit 1
+  fi
+  if [ "$EXPTYPE" == "spectral" ]; then
+    resfiles=("atmos_model.res" "atmosphere.res.nc" "spectral_dynamics.res.nc")
+  elif [ "$EXPTYPE" == "fv" ]; then
+    resfiles=("atmos_model.res" "atmos_tracers.res.nc" "fv_rst.res.nc" "fv_srf_wnd.res.nc")
+  elif [ "$EXPTYPE" == "bgrid" ]; then
+    resfiles=("atmos_model.res" "atmos_tracers.res.nc" "bgrid_prog_var.res.nc")
+  fi
+  echo "Moving restart files from ${rdir##*/}/RESTART to ${PWD##*/}/INPUT..."
+  for file in ${resfiles[@]}; do
+    if [ ! -r $rdir/RESTART/$file ]; then
+      echo "Error: Missing restart file ${rdir##*/}/RESTART/${file}."
+      exit 1
+    else
+      cp $rdir/RESTART/$file INPUT/$file
+    fi
+  done
+}
+
+################################################################################
+# Function for running the next model step from a previous step
+function Iterate() {
+  # Use MPIRUN to run model in parallel
+  echo "Running model..."
+  start=$(date +%s)
+  $mpirun -np $CORES ./fms.x &>log.model # need ./fms.x, not fms.x
+  for ncfile in *.nc.0000; do
+    [ "$ncfile" == "*.nc.0000" ] && echo "Error: No netcdf files produced." && exit 1
+    files=(${ncfile%%.*}.nc*) # put into array
+    echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
+    $mppnccombine -r ${ncfile%%.*}.nc ${files[@]}
+    [ ! -r "${ncfile%%.*}.nc" ] && echo "Error: mppnccombine failed." && exit 1
+  done
+  daystring=$(pwd) # current directory
+  daystring=${daystring##*/} # the day-string
+  mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}_${daystring}.nc # copy to set location
+  echo "Elapsed time: $(($(date +%s) - $start))s."
+  # Remove ueless files that just take up disk space
+  [ -d INPUT ] && rm -r INPUT # remove everything
+  [ -r logfile.0000.out ] && mv logfile.0000.out log.init # contains init info
+  rm fms.x # remove executable, because takes up space
+}
+
+##############################################################################
+# Run the model in blocks of $DAYS days
+# Prepare for the loop
+echo "Running control experiment from day $TSTART to day $TEND."
+origin=$(date +%s) # start time
+pday=$(($TSTART - $DAYS)) # only time when we do minus days
+cday=$TSTART
+nday=$(($TSTART + $DAYS))
+mkdir
+while [ $nday -le $TEND ]; do
+  # Message and reset timer
+  echo "Running from day $cday to day $nday."
+  time=$(date +%s)
+  # Run the model
+  pdir=$basedir/d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
+  cdir=$basedir/d$(printf "%04d" $cday)-d$(printf "%04d" $nday)
+  Setup $cdir # sets up working directory, cd into it
+  [[ $cday -gt 0 ]] && Restart $pdir # add restart files
+  Iterate # run model
+  # Step things forward, for next iteration
+  pday=$cday
+  cday=$(($pday + $DAYS))
+  nday=$(($cday + $DAYS))
+done
+echo "The control run completed successfully in $(($(date +%s) - $origin)) seconds!"
+echo "Timestamp: $(date)."
+

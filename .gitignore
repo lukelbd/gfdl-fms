@@ -5,6 +5,10 @@
 !input*.nml
 !levels*.nml
 !forcing*.nml
+
+# Ignore executables #
+######################
+*.x
 run/bin
 
 # VIM extras #

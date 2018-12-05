@@ -481,7 +481,7 @@ enddo
 ! vortex weighting
 w_vtx(:,:) = 0.0 ! standard atmosphere everywhere
 if (strat_vtx) then
-  w_vtx(:,:) = 0.5*(1.0 + tanh((lat(:,:)-abs(vtx_edge_r))/vtx_wid_r)) ! vortex in northern hemisphere
+  w_vtx(:,:) = 0.5*(1.0 + tanh((lat(:,:) - abs(vtx_edge_r))/vtx_wid_r)) ! vortex in northern hemisphere
 endif
 ! this was previously below, but is *not* part of the held-suarez specification
 ! t_const(:,:) = t_strat - eps*sin(lat(:,:))

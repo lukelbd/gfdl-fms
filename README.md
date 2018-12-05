@@ -43,7 +43,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 ### `&forcing_nml`
 
-Note for all damping parameters, positive value means seconds, negative means days, and zero means off (no damping). To apply damping to mean and anomaly components separately, make sure `ndamp_decomp` and/or `rdamp_decomp` are set to `.true.`, and specify in the namelist e.g. `ktrop = -40, 0` for the mean and anomaly components, respectively.
+Note for all damping parameters, a positive value means seconds, negative means days, and zero means off (no damping). To apply damping to mean and anomaly components separately, make sure `ndamp_decomp` and/or `rdamp_decomp` are set to `.true.`, and specify in the namelist e.g. `ktrop = -40, 0` for the mean and anomaly components, respectively.
 
 | Parameter | Default value | Applicable stratosphere mode | Description |
 | --- | --- | --- | --- | 

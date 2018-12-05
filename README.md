@@ -5,6 +5,37 @@ See the file [doc.pdf](https://github.com/lukelbd/gfdl-drycore/master/blob/doc.p
 Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml).
 
 # Model Documentation
+## Diagnostic table `diag_table`
+Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
+
+### Header lines
+
+  1. Experiment title
+  1. Base date for netCDF output; default is `0000-00-00 00:00:00`)
+
+### Ouput file line (6 comma-separated values)
+
+  1. File name string
+  1. Output frequency, one of the following:
+  * \>`0`: output frequency in units `"units"`
+  * `0`: output at every timestep
+  * `-1`: output at the end of run
+  1. Output frequency units: use one of `"years"`, `"months"`, `"days"`, `"minutes"`, `"hours"`, `"seconds"`
+  1. Format: use `1` for NetCDF (the **only** supported format... not sure why it has a column)
+  1. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`
+  1. Time axis name: name for time axis on output NetCDF, default `"time"`
+
+### Diagnostic field line (8 comma-separated values)
+
+  1. Module name that can export this parameter name (e.g. `"dynamics"` or `"forcing"`)
+  1. Fortran module parameter name 
+  1. Parameter name for NetCDF file
+  1. File name string
+  1. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
+  1. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`
+  1. Other options: not implemented... use the dummy string `"none"`
+  1. Packing value: `1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer
+
 ## Namelist `input.nml`
 ### `&main_nml`
 
@@ -83,35 +114,4 @@ Note for all damping parameters, a positive value means seconds, negative means 
 | Parameter | Default value | Description |
 | --- | --- | --- |
 | `domains_stack_size` | 8000000 | Necessary value varies for different model resolutions, domain decompositions, and number of processors used. Quote from documentation: "If you increase the model resolution or are running on a small number of processors, you may get the error message `MPP_UPDATE_DOMAINS user stack overflow`. In this case, increase the domain stack size found in the core-specific namelist files. The new stack size should be greater than or equal to the number printed in the error message." |
-
-## Diagnostic table `diag_table`
-Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
-
-### Header lines
-
-  1. Experiment title
-  1. Base date for netCDF output; default is `0000-00-00 00:00:00`)
-
-### Ouput file line (6 comma-separated values)
-
-  1. File name string
-  1. Output frequency, one of the following:
-  * \>`0`: output frequency in units `"units"`
-  * `0`: output at every timestep
-  * `-1`: output at the end of run
-  1. Output frequency units: use one of `"years"`, `"months"`, `"days"`, `"minutes"`, `"hours"`, `"seconds"`
-  1. Format: use `1` for NetCDF (the **only** supported format... not sure why it has a column)
-  1. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`
-  1. Time axis name: name for time axis on output NetCDF, default `"time"`
-
-### Diagnostic field line (8 comma-separated values)
-
-  1. Module name that can export this parameter name (e.g. `"dynamics"` or `"forcing"`)
-  1. Fortran module parameter name 
-  1. Parameter name for NetCDF file
-  1. File name string
-  1. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
-  1. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`
-  1. Other options: not implemented... use the dummy string `"none"`
-  1. Packing value: `1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer
 

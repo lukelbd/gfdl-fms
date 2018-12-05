@@ -34,7 +34,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
   1. Time sampling for taking averages: currently, only support averaging over *all* time steps of model run
   1. Whether we take time average, one of `.true.` or `.false.` -- for `.true.`, the file output frequency should be `-1`
   1. Other options: not implemented... use the dummy string `"none"`
-  1. Packing value: `1` = double [64], `2` = float [32] (best for most applications), `4` = 16-bit integer
+  1. Packing value: `1` = double or 64-bit, `2` = float or 32-bit (best for most applications), `4` = 16-bit integer
 
 ## Namelist `input.nml`
 ### `&main_nml`

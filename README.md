@@ -43,13 +43,13 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 
 ### `&forcing_nml`
 
-**Note for all damping parameters, positive value means seconds, negative means days, and zero means off (no damping).**
+**Note for all damping parameters, positive value means seconds, negative means days, and zero means off (no damping). To apply damping to mean and anomaly components separately, make sure `ndamp_decomp` and/or `rdamp_decomp` are set to `.true.`, and specify in the namelist e.g. `ktrop = -40, 0` for the mean and anomaly components, respectively.**
 
 | Parameter | Default value | Applicable stratosphere mode | Description |
 | --- | --- | --- | --- | 
-| `no_forcing`   | `.false.`    | all        | Turn off forcing altogether (same as setting each 'k' to zero)
-| `ndamp_decomp` | `.true.`     | all        | Separate zonal mean/anomaly components of damping?
-| `rdamp_decomp` | `.false.`    | all        | Apply frictional damping separately for mean and anomaly components?
+| `no_forcing`   | `.false.`    | all        | Turn off forcing altogether, same as setting each damping timescale to zero
+| `ndamp_decomp` | `.true.`     | all        | Apply thermal damping separately for mean and anomaly components?
+| `rdamp_decomp` | `.false.`    | all        | Apply mechanical damping separately for mean and anomaly components?
 | `strat_vtx`    | `.true.`     | `pk`, `da` | Apply polar vortex?
 | `strat_sponge` | `.true.`     | `pk`, `da` | Toggle sponge layer above 1hPa?
 | `strat_mode`   | `'hs'`       | all        | One of `'hs'`, `'pk'`, or `'da'`
@@ -58,7 +58,7 @@ Namelist parameters for the modified forcing scheme are specified in the `&forci
 | `t_strat`      | `200`        | all        | Minimum equilibrium temperature in summer stratosphere
 | `delh`         | `60`         | all        | Surface equator-pole difference in equilibrium temperature
 | `delv`         | `10`         | all        | Controls static stability (vertical gradient) of Te
-| `eps`          | `0`          | all        | Applies extra `Teq-->Teq+sin(lat)*eps` gradient (so eps=10 increases gradient by 10K SH, reduces in NH)
+| `eps`          | `0`          | all        | Applies seasonality, where positive `N` reduces the equator-pole difference in equilibrium temperature by `N` Kelvin in the northern hemisphere, and increases it by that much in the southern hemisphere
 | `sigma_b`      | `0.7`        | all        | Top of "boundary layer" in sigma coordinates
 | `z_pkswitch`   | `16`         | `pk`       | Height (in km) above which `pk` stratosphere is applied
 | `z_kdepth`     | `5`          | `da`       | Depth (in km) of transition region between `ktrop` and `kstrat`

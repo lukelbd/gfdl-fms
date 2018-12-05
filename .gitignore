@@ -5,6 +5,7 @@
 !input*.nml
 !levels*.nml
 !forcing*.nml
+run/bin
 
 # VIM extras #
 ##############

@@ -85,7 +85,7 @@ Note for all damping parameters, a positive value means seconds, negative means 
 | `strat_sponge` | `.true.`     | `pk`, `da` | Toggle sponge layer above 1hPa?
 | `strat_mode`   | `'hs'`       | all        | One of `'hs'`, `'pk'`, or `'da'`
 | `strat_damp`   | `'constant'` | `da`       | One of `'constant'` or `'linear'`
-| `t_zero`       | `315`        | all        | Equilibrium temperature of the equator at the surface
+| `t_zero`       | `315`        | all        | Equilibrium temperature for the equator at the surface
 | `t_strat`      | `200`        | all        | Minimum equilibrium temperature in summer stratosphere
 | `delh`         | `60`         | all        | Equator-pole difference in surface equilibrium temperature
 | `delv`         | `10`         | all        | Controls static stability (vertical gradient) of Te

@@ -68,7 +68,7 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 | `num_spherical`          | `43` | should generally equal `num_fourier + 1` |
 | `fourier_inc`            | `1` | number of 'sectors' for dividing up spectral model |
 | `triang_trun`            | `.true.` | triangular truncation, or rhomboidal? |
-| `topography_option`      | `'flat'` | `'flat'` for no topography, `'input'` to use a netCDF in the `INPUT` directory |
+| `topography_option`      | `'flat'` | `'flat'` for no topography, `'input'` to use a NetCDF in the `INPUT` directory |
 | `vert_coord_option`      | `'even_sigma'` | `'input'` to use the `&vert_coordinate_nml`, `pk_sigma` for Polvani and Kushner (2002) style level spacing, `even_sigma` for simple, evenly spaced sigma coordinates, and a few other options |
 | `valid_range_t` | `100.0, 500.0` | temperature range outside which we consider model to have "blown up" |
 

@@ -48,7 +48,7 @@ Note for all damping parameters, a positive value means seconds, negative means 
 | Parameter | Default value | Applicable stratosphere mode | Description |
 | --- | --- | --- | --- | 
 | `no_forcing`   | `.false.`    | all        | Turn off forcing altogether, same as setting each damping timescale to zero
-| `ndamp_decomp` | `.true.`     | all        | Apply thermal damping separately for mean and anomaly components?
+| `ndamp_decomp` | `.false.`     | all        | Apply thermal damping separately for mean and anomaly components?
 | `rdamp_decomp` | `.false.`    | all        | Apply mechanical damping separately for mean and anomaly components?
 | `strat_vtx`    | `.true.`     | `pk`, `da` | Apply polar vortex?
 | `strat_sponge` | `.true.`     | `pk`, `da` | Toggle sponge layer above 1hPa?

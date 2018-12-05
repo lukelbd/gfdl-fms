@@ -54,8 +54,8 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 | `damping_coeff`          | `1.15741e-4` | diffusion strength |
 | `do_mass_correction`     | `.true.` | prevent changing mean surface pressure? |
 | `do_energy_correction`   | `.true.` | prevent changing total kinetic and potential energy? |
-| `do_water_correction`    | `.true.` | prevent changing atmospheric water vapor? (for aquaplanet) |
-| `use_virtual_temperature` | `.true.` | consider moisture in computation of geopotential? (for aquaplanet) |
+| `do_water_correction`    | `.false.` | prevent changing atmospheric water vapor? (for aquaplanet) |
+| `use_virtual_temperature` | `.false.` | consider moisture in computation of geopotential? (for aquaplanet) |
 | `vert_advect_uv`         | `'second_centered'` | vertical advection scheme for horizontal wind |
 | `vert_advect_t`          | `'second_centered'` | vertical advection scheme for temperature |
 | `longitude_origin`       | `0` | |

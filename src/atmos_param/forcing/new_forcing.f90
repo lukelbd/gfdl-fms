@@ -49,7 +49,8 @@ real :: sigma_b  = 0.7
 real :: t_zero = 315., t_strat_usstd = 216.65, t_strat = 200.0
 real :: delh   = 60.0, delv          = 10.0,   eps     = 0.0
 real :: vtx_edge = 50.0,   vtx_wid  = 10.0, vtx_gam   = 2.0
-real :: p_ref    = 1000.0, p_sponge = 0.5,  p_logeval = 200.0, z_pkswitch = 16.0, z_kdepth = 50.0
+real :: p_ref    = 1000.0, p_sponge = 0.5,  p_logeval = 200.0
+real :: z_pkswitch = 16.0, z_kdepth = 50.0 ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
 real :: lat_trop_ref = 0
 
 ! namelist can specify just *one* value, and it will be

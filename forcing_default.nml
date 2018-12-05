@@ -1,0 +1,35 @@
+! Forcing namelist for GFDL model compiled with code for the
+! modified Polvani-Kushner version
+&forcing_nml
+  no_forcing      = .false.,    ! turn off forcing altogether (same as setting each 'k' to zero)
+  strat_mode      = 'pk',       ! can be hs, pk, or da (i.e. my custom stuff)
+  strat_vtx       = .true.,     ! (pk/da) turn on and off the polar vortex
+  strat_sponge    = .true.,     ! (pk/da) turn on sponge
+  strat_damp      = 'constant', ! (da) linear: transition from kstrat at tropopause to kmeso at TOA linearly; constant: use kstrat everywhere in
+  ndamp_decomp    = .true.,     ! (da) separate zonal mean/anomaly components of thermal damping?
+  rdamp_decomp    = .false.,    ! (da) same for friction damping?
+  t_zero          = 315.,       ! temp at equator surface
+  t_strat         = 200.,       ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
+  delh            = 60.,        ! equator-pole temp contrast
+  delv            = 10.,        ! lapse rate scaling, probably should be left alone
+  eps             = 0.,         ! seasons; delh=delh+eps in north hemisphere, delh=delh-eps in south hemisphere
+  exp_b           = 4,          ! cosine latitude exponent for boundary layer damping equation; Shneider uses 8, Held-Suarez 4
+  sigma_b         = 0.7,        ! boundary level; below which friction and elevated thermal damping start
+  z_pkswitch      = 16.,        ! (pk) flat level above which Polvani-Kushner strat begins (km)
+  z_kdepth        = 5.,         ! (da) depth of transition region for troposphere-to-stratosphere damping
+  lat_trop_ref    = 0.,         ! (da) latitude at which we use exact US standard atmosphere; everywhere else, it is warped
+  p_sponge        = 0.5,        ! (pk/da) level above which sponge on winds is applied (hPa)
+  p_logeval       = 200.,       ! (da) pressure at which we evaluate the log(p/p0) when inverting Held-Suarez
+  vtx_edge        = 50.,        ! (pk/da) edge of the vortex
+  vtx_wid         = 20.,        ! (pk/da) width of the vortext-US standard atmosphere transition region
+  vtx_gam         = 2.,         ! (pk/da) lapse rate in polar vortex region (K/km), paper uses 2 and 4
+  ksponge         = -0.5,       ! (pk/da) sponge damping rate
+  kfric           = -1.,        ! friction damping rate
+  kbl             = -4.,        ! maximum boundary layer thermal damping, realized at equatorial surface
+  ktrop           = -40.,       ! troposphere damping (if hs, also applies in stratosphere)
+  kstrat          = -40.,       ! (pk/da) stratosphere damping
+  kmeso           = -4.,        ! (pk/da) damping rate at upper boundary, Holton-Mass style
+  trsink          = -4.,        ! tracer stuff
+  trflux          = 1.e-5,      ! tracer stuff
+  conserve_energy = .true.,     ! employ frictional warming
+/

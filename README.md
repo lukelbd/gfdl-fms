@@ -100,7 +100,6 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
     * >0 = output frequency in units `"units"`
     * 0 = output at every timestep
     * -1 = output at the end of run
-
   1. Output frequency units: use `"years"`, `"months"`, `"days"`, `"minutes"`, `"hours"`, `"seconds"`
   1. Format: use `1` for NetCDF (the **only** supported format... not sure why it has a column)
   1. Time axis units: units for time axis on output NetCDF; use one of `"days"`, `"minutes"`, `"hours"`, `"seconds"`

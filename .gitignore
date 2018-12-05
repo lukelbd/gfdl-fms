@@ -1,7 +1,10 @@
 # Ignore top-level fortran files (used for learning purposes) #
 ###############################################################
-# /*.f90
-# /*.nml
+/*.f90
+/*.nml
+!input*.nml
+!levels*.nml
+!forcing*.nml
 
 # VIM extras #
 ##############

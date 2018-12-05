@@ -1,0 +1,74 @@
+#!/bin/bash
+# Script for compiling fortran source code, as user has specified. Then the runscript will integrate
+# it forward, produce output, etc.
+#------------------------------------------------------------------------------#
+# Path names
+#------------------------------------------------------------------------------#
+include=(/usr/include/mpich-x86_64)
+links=(/usr/lib64/mpich/lib)
+root=../
+pgi=/opt/pgi/linux86-64/17.10/bin
+#------------------------------------------------------------------------------
+# Build executable model code and post-processing tool
+#------------------------------------------------------------------------------
+# Definitions
+src=../src                                  # path to directory containing model source code
+bindir=./bin                                # where code is compiled and executable is created
+pathnames=../src/path_names_new             # change this to pick different blocks of code
+mkmf=../bin/mkmf                            # path to executable mkmf
+mkmftemplate=../bin/mkmf.template           # template of most basic settings
+mppnsource=../postprocessing/mppnccombine.c # source code
+cppdefs="-Duse_libMPI -Duse_netCDF"         # not sure what this does
+flags_links="${links[@]/#/-L}"              # search these paths for library files
+flags_include="${include[@]/#/-I}"          # include flags
+flags_libs="-lmpl -lmpich -lfmpich -lmpichf90 -lnetcdff -lnetcdf -lhdf5_hl -lhdf5 -lm -lz" # for mppnccombine
+# Make sure necessary things tools are in path
+[ ! -d $bindir ]      && mkdir $bindir || echo "Warning: Leaving old compiled source."
+[ ! -d $src ]          && echo "Error: Could not find source code directory $src."        && exit 1
+[ ! -r $pathnames ]    && echo "Error: Could not find path_names file $pathnames."        && exit 1
+[ ! -r $mppnsource ]   && echo "Error: Could not find mppnccombine source code."          && exit 1
+[ ! -r $mkmftemplate ] && echo "Error: Could not find Makefile template."          && exit 1
+[ ! -r $mkmf ]         && echo "Error: Could not find Makefile-generating utility $mkmf." && exit 1
+#------------------------------------------------------------------------------#
+# Create mppnccombine; should supply with same libraries supplied to model executable through its makefile
+# $pgi/pgcc -O -o $mppnccombine -I$netcdfc/include -I$mpich/include $mppnsource $flags_links $flags_libs
+# Notes on flags:
+#   -O[level]: set optimization level; sets to 2 if number not specified
+#   -o file: use this file as name of executable
+#   -I directory: add directory to compiler search path; these are 'header' files
+#   -L directory: change the directory in which "linker" searches for libraries
+#   -l library: load lib<library>.a from the standard library directory (supplied by L?)
+$pgi/pgcc -O -o mppnccombine.x $flags_include $mppnsource $flags_links $flags_libs
+time=$(date +%s)
+echo "Generating mppnccombine executable..."
+#------------------------------------------------------------------------------#
+# Build makefile template (assumes pgi bin is on $PATH)
+cd $bindir # move to source directory
+cat > mkmf.template << DELIM
+CC = $pgi/pgcc
+FC = $pgi/pgf90
+LD = $pgi/pgf90
+CPPFLAGS = -Mmpi=mpich
+FFLAGS = -Mmpi=mpich -r8 -Ktrap=fp -pc 64 -O2
+LDFLAGS = $flags_links $flags_libs -Mmpi=mpich
+LIST = -Mlist
+DELIM
+cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
+#------------------------------------------------------------------------------#
+# Create makefile
+echo "Generating Makefile..."
+cat mkmf.template
+$mkmf -p fms.x -t mkmf.template -c "$cppdefs" -a $src $pathnames \
+  $src/shared/mpp/include $src/shared/include ${include[@]} # the other include files
+  # -p = program (name of final target)
+  # -t = template (list of MACROS/COMMANDS that get appended to beginning of final Makefile)
+  # -c = list of 'cpp #define's passed to source files (what?)
+  # -a = abspath, attaches 'abspath' (here, $src) to the FRONT of RELATIVE paths to the source file
+  # args (all the later stuff) = list of directories/files to be searched for targets and dependencies
+#------------------------------------------------------------------------------#
+# Compile source
+echo "Compiling source code..."
+make -f Makefile
+cp ./fms.x ../ # copy to script directory
+echo "This script took $(($(date +%s) - $time)) seconds."
+

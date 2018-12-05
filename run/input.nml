@@ -1,0 +1,82 @@
+! Primary namelist for running GFDL spectral core
+! * Most names are self-explanatory; alpha has to do with finite differencing scheme,
+!   and damping coefficient is for hyperdiffusion on small scales.
+! * Not sure why num_fourier means truncation number and num_spherical has to be
+!   one more than that, or what happens if this isn't satisfied.
+&main_nml
+  dt_atmos = 600,
+  days     = 1,
+  hours    = 0,
+  minutes  = 0,
+  seconds  = 0,
+/
+&fms_nml
+  domains_stack_size = 8000000, ! 8MB, and monde has 32GB RAM
+/
+&fms_io_nml
+  threading_write = 'single',
+  fileset_write = 'single',
+/
+! Resolution and stuff
+&spectral_dynamics_nml
+  damping_option            = 'resolution_dependent',
+  damping_order             = 4,          ! hyperdiffusion exponent
+  damping_coeff             = 1.15741e-4, ! hyperdifussion coefficient
+  do_mass_correction        = .true.,
+  do_energy_correction      = .true.,
+  do_water_correction       = .false.,
+  use_virtual_temperature   = .false.,
+  vert_advect_uv            = 'second_centered',
+  vert_advect_t             = 'second_centered',
+  longitude_origin          = 0.0,
+  robert_coeff              = .04,
+  alpha_implicit            = .5,
+  reference_sea_level_press = 101325., ! mean surface pressure in Pa
+  lon_max                   = 128,     ! number of lons
+  lat_max                   = 64,      ! number of lats
+  num_levels                = 20,      ! number of levels
+  num_fourier               = 42,      ! truncation number
+  num_spherical             = 43,      ! == truncation number + 1
+  fourier_inc               = 1,
+  triang_trunc              = .true.,
+  topography_option         = 'flat',       ! if you add to this directory a file named topography.data.nc, the run script will put it into the INPUT folders and model will read the data
+  vert_coord_option         = 'even_sigma', ! can also be 'pk_sigma' for high resolution stratosphere
+  valid_range_t             = 100., 500.,   ! model stops if temp goes outside this range
+/
+! Forcing namelist for GFDL model compiled with code for the
+! modified Polvani-Kushner version
+! Parentheses (pk/da), (pk), (da) indicate when parameters apply
+! only to a particular forcing scheme
+&forcing_nml
+  no_forcing      = .false.,    ! turn off forcing altogether (same as setting each 'k' to zero)
+  strat_mode      = 'pk',       ! can be hs, pk, or da (i.e. my custom stuff)
+  strat_vtx       = .true.,     ! (pk/da) turn on and off the polar vortex
+  strat_sponge    = .true.,     ! (pk/da) turn on sponge
+  strat_damp      = 'constant', ! (da) linear: transition from kstrat at tropopause to kmeso at TOA linearly; constant: use kstrat everywhere in above tropopause
+  ndamp_decomp    = .true.,     ! (da) separate zonal mean/anomaly components of thermal damping?
+  rdamp_decomp    = .false.,    ! (da) same for friction damping?
+  t_zero          = 315.,       ! temp at equator surface
+  t_strat         = 200.,       ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
+  delh            = 60.,        ! equator-pole temp contrast
+  delv            = 10.,        ! lapse rate scaling, probably should be left alone
+  eps             = 0.,         ! seasons; delh=delh+eps in north hemisphere, delh=delh-eps in south hemisphere
+  exp_b           = 4,          ! cosine latitude exponent for boundary layer damping equation; Shneider uses 8, Held-Suarez 4
+  sigma_b         = 0.7,        ! boundary level; below which friction and elevated thermal damping start
+  z_pkswitch      = 16.,        ! (pk) flat level above which Polvani-Kushner strat begins (km)
+  z_kdepth        = 5.,         ! (da) depth of transition region for troposphere-to-stratosphere damping
+  lat_trop_ref    = 0.,         ! (da) latitude at which we use exact US standard atmosphere; everywhere else, it is warped
+  p_sponge        = 0.5,        ! (pk/da) level above which sponge on winds is applied (hPa)
+  p_logeval       = 200.,       ! (da) pressure at which we evaluate the log(p/p0) when inverting Held-Suarez
+  vtx_edge        = 50.,        ! (pk/da) edge of the vortex
+  vtx_wid         = 20.,        ! (pk/da) width of the vortext-US standard atmosphere transition region
+  vtx_gam         = 2.,         ! (pk/da) lapse rate in polar vortex region (K/km), paper uses 2 and 4
+  ksponge         = -0.5,       ! (pk/da) sponge damping rate
+  kfric           = -1.,        ! friction damping rate
+  kbl             = -4.,        ! maximum boundary layer thermal damping, realized at equatorial surface
+  ktrop           = -40.,       ! troposphere damping (if hs, also applies in stratosphere)
+  kstrat          = -40.,       ! (pk/da) stratosphere damping
+  kmeso           = -4.,        ! (pk/da) damping rate at upper boundary, Holton-Mass style
+  trsink          = -4.,        ! tracer stuff
+  trflux          = 1.e-5,      ! tracer stuff
+  conserve_energy = .true.,     ! employ frictional warming
+/

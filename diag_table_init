@@ -1,0 +1,47 @@
+"Results from dry core damping experiments."
+0 0 0 0 0 0
+################################################################################
+# Diagnostic table, describes data saved to netCDF
+# * First two lines *must* contain the experiment name, and the base time for
+#   the time axis. No comments above there.
+# * Warning: If you accidentally try to output two vars w/ same name, get
+#   silent failure.
+# * Note this is not a builtin fortran feature; GFDL model just reads and
+#   parses this file according to a certain syntax.
+
+################################################################################
+# First declare filenames:
+# 1. name
+# 2. save-frequency [-1==at end, 0==all, >0==units]
+# 3. save-frequency units
+# 4. format [1 = netCDF, only supported format]
+# 5. time dimension unit
+# 6. time dimension name
+filename, outfreq, frequnits, 1, "days", "time",
+
+################################################################################
+# Variables to save:
+# 1. module name
+# 2. fortran name
+# 3. save name
+# 4. file name
+# 5. time-sampling freq for averages
+# 6. whether we take average
+# 7. other options
+# 8. save size [currently F32]
+# Note cannot save time-average data in same file as non-time-average data, it seems
+# Some decisions regarding output variables:
+# * Store A and B hybrid coefficients as hyai and hybi to match the ECHAM conventions;
+#   they MUST BE STORED THIS WAY for CDO interpolation procedure to read them.
+# * Don't save vor; can calculate on the fly using CDO spectral-coordinate
+#   algorithm, if necessary.
+# * Don't bother with tau and Teq; can calculate them from model parameters
+#   (Although tau is function of model level can approximate from p data).
+"dynamics", "temp",  "t",     filename, "all", .false., "none", 2,
+"dynamics", "bk",    "hybi",  filename, "all", .false., "none", 2,
+"dynamics", "pk",    "hyai",  filename, "all", .false., "none", 2,
+"forcing",  "teq",   "teq",   filename, "all", .false., "none", 2,
+"forcing",  "ndamp_mean", "ndamp_mean", filename, "all", .false., "none", 2,
+"forcing",  "ndamp_anom", "ndamp_anom", filename, "all", .false., "none", 2,
+"forcing",  "rdamp_mean", "rdamp_mean", filename, "all", .false., "none", 2,
+"forcing",  "rdamp_anom", "rdamp_anom", filename, "all", .false., "none", 2,

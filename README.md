@@ -10,6 +10,18 @@ The Polvani and Kushner method for constructing levels with high stratospheric r
 
 Alternatively, I've copied various hybrid coordinate configurations used by ECMWF products, found in the `levels` directory. These can be copied into a `&vert_coordinate_nml` namelist entry as shown in `levels_era.nml` (which employs the 60-level ERA-Interim configuration), and applied using `vert_coord_option='input'` in the `&spectral_dynamics_nml` namelist (see below).
 
+Note the ERA-Interim archive was produced with the Cy31r1 model release, i.e. 91 levels with T255 truncation. A table of truncation numbers, resulting (recommended) number of latitudes, and the parallelization restrictions is shown below.
+
+| Truncation | Number of latitudes | Recommended number of cores (latitudes per file) |
+| ---        | ---    |  ---       | ---     |
+| 42 | 64 | 16 (4) |
+| 63 | 96 | 24 (4) |
+| 85 | 128 | 32 (4) |
+| 106 | 160 | 40 (4) |
+| 159 | 240 | 60 (4) |
+| 170 | 256 | 64 (4) |
+| 266 | | 400 | 100 (4) |
+
 ## Diagnostic table `diag_table`
 Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
 

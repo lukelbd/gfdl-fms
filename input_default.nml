@@ -4,8 +4,8 @@
 ! * Not sure why num_fourier means truncation number and num_spherical has to be
 !   one more than that, or what happens if this isn't satisfied.
 &main_nml
-  dt_atmos = 0,
-  days     = 0,
+  dt_atmos = 0, ! these should be filled automatically be run script
+  days     = 0, ! these should be filled automatically be run script
   hours    = 0,
   minutes  = 0,
   seconds  = 0,

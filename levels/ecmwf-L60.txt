@@ -1,4 +1,4 @@
-USED IN MUCH OLDER PRODUCTS
+Used in ERA-Interim; see https://rda.ucar.edu/datasets/ds630.0/docs/ERA5.erai_era5_comparison.html
 n	a [Pa]	b	ph [hPa]	pf [hPa]	Geopotential Altitude [m]	Geometric Altitude [m]	Temperature [K]	Density [kg/m^3]
 0	0.000000	0.000000	0.000000	-	-	-	-	-
 1	20.000000	0.000000	0.2000	0.1000	64947.31	65616.42	231.60	0.000150

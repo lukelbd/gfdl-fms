@@ -5,6 +5,11 @@ See the file [doc.pdf](https://github.com/lukelbd/gfdl-drycore/master/blob/doc.p
 Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml).
 
 # Model Documentation
+## Model levels
+The Polvani and Kushner method for constructing levels with high stratospheric resolution has been implemented directly, and can be requested using `vert_coord_option='pk_sigma'` (analagous to `vert_coord_option='even_sigma'`) in the `&spectral_dynamics_nml` namelist (see below).
+
+Alternatively, I've copied various hybrid coordinate configurations used by ECMWF products, found in the `levels` directory. These can be copied into a `&vert_coordinate_nml` namelist entry as shown in `levels_era.nml` (which employs the 60-level ERA-Interim configuration), and applied using `vert_coord_option='input'` in the `&spectral_dynamics_nml` namelist (see below).
+
 ## Diagnostic table `diag_table`
 Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
 

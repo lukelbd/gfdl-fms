@@ -1,4 +1,4 @@
-MODEL LEVELS USED IN ERA-Interim (skip this row when reading)
+Used in operationsl ECMWF model; https://artefacts.ceda.ac.uk/badc_datadocs/ecmwf-op/levels.html
 n	a [Pa]	b	ph [hPa]	pf [hPa]	Geopotential Altitude [m]	Geometric Altitude [m]	Temperature [K]	Density [kg/m^3]
 0	0.000000	0.000000	0.000000	-	-	-	-	-
 1	2.000040	0.000000	0.0200	0.0100	79302.74	80302.61	198.04	0.000018

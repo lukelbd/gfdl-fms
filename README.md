@@ -13,7 +13,7 @@ Alternatively, I've copied various hybrid coordinate configurations used by ECMW
 Note the ERA-Interim archive was produced with the Cy31r1 model release, i.e. 91 levels with T255 truncation. A table of truncation numbers, resulting (recommended) number of latitudes, and the parallelization restrictions is shown below.
 
 | Truncation | Number of latitudes | Recommended number of cores (latitudes per file) |
-| ---        | ---    |  ---       | ---     |
+| ---        | ---    |  ---       |
 | 42 | 64 | 16 (4) |
 | 63 | 96 | 24 (4) |
 | 85 | 128 | 32 (4) |

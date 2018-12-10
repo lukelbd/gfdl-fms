@@ -90,11 +90,12 @@ character(len=128) :: tagname='$Name: latest $'
 real :: trdamp
 real, dimension(2) :: tktrop, tkbl, tkstrat, tkmeso, vkfric, vksponge
 
-! integer :: id_ndamp, id_rdamp, id_teq, id_tdt, id_udt, id_vdt,  &
-!   id_tdt_diss, id_heat_diss
-integer :: id_teq, id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
+integer :: id_teq, &
+  id_ndamp, id_rdamp, id_teq, id_tdt, id_udt, id_vdt, &
+  id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
   id_tdt_mean, id_tdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
-  id_tdt_diss, id_heat_diss, id_udt_spg, id_vdt_spg
+  id_tdt_diss, id_heat_diss, &
+  id_udt_spg, id_vdt_spg
 
 real    :: missing_value = -1.e10
 character(len=14) :: mod_name = 'forcing'
@@ -187,28 +188,35 @@ endif
 !-----------------------------------------------------------------------
 !     thermal damping for held & suarez (1994) benchmark calculation
 
-call newtonian_damping_da ( Time, lat, ps, p_full, t, ttnd, tdamp, teq, mask )
+call newtonian_damping ( Time, lat, ps, p_full, t, ttnd, tdamp, teq, mask )
 
 !-----------------------------------------------------------------------
 !     apply forced tendencies and send data
+! Note when damping is not decomposed into mean/anomaly components, the damping
+! rate is simply stored in first position (where mean damping rate stored)
 
 udt  = udt + utnd_spg + utnd(:,:,:,1) + utnd(:,:,:,2)
 vdt  = vdt + vtnd_spg + vtnd(:,:,:,1) + vtnd(:,:,:,2)
 
-if (id_udt_mean   > 0) used = send_data ( id_udt_mean,   utnd(:,:,:,1),  Time, is, js)
-if (id_udt_anom   > 0) used = send_data ( id_udt_anom,   utnd(:,:,:,2),  Time, is, js)
-if (id_vdt_mean   > 0) used = send_data ( id_vdt_mean,   vtnd(:,:,:,1),  Time, is, js)
-if (id_vdt_anom   > 0) used = send_data ( id_vdt_anom,   vtnd(:,:,:,2),  Time, is, js)
-if (id_rdamp_mean > 0) used = send_data ( id_rdamp_mean, uvdamp(:,:,:,1), Time, is, js)
-if (id_rdamp_anom > 0) used = send_data ( id_rdamp_anom, uvdamp(:,:,:,2), Time, is, js)
+if (id_udt        > 0) used = send_data ( id_udt_mean,   sum(utnd(:,:,:,:),4), Time, is, js)
+if (id_udt_mean   > 0) used = send_data ( id_udt_mean,   utnd(:,:,:,1),        Time, is, js)
+if (id_udt_anom   > 0) used = send_data ( id_udt_anom,   utnd(:,:,:,2),        Time, is, js)
+if (id_vdt        > 0) used = send_data ( id_vdt_mean,   sum(vtnd(:,:,:,:),4), Time, is, js)
+if (id_vdt_mean   > 0) used = send_data ( id_vdt_mean,   vtnd(:,:,:,1),        Time, is, js)
+if (id_vdt_anom   > 0) used = send_data ( id_vdt_anom,   vtnd(:,:,:,2),        Time, is, js)
+if (id_rdamp      > 0) used = send_data ( id_rdamp,      uvdamp(:,:,:,1),      Time, is, js)
+if (id_rdamp_mean > 0) used = send_data ( id_rdamp_mean, uvdamp(:,:,:,1),      Time, is, js)
+if (id_rdamp_anom > 0) used = send_data ( id_rdamp_anom, uvdamp(:,:,:,2),      Time, is, js)
 
 tdt = tdt + ttnd_diss + ttnd(:,:,:,1) + ttnd(:,:,:,2) ! mean and anomaly components
 
-if (id_teq        > 0) used = send_data ( id_teq,        teq,            Time, is, js)
-if (id_tdt_mean   > 0) used = send_data ( id_tdt_mean,   ttnd(:,:,:,1),  Time, is, js)
-if (id_tdt_anom   > 0) used = send_data ( id_tdt_anom,   ttnd(:,:,:,2),  Time, is, js)
-if (id_ndamp_mean > 0) used = send_data ( id_ndamp_mean, tdamp(:,:,:,1), Time, is, js)
-if (id_ndamp_anom > 0) used = send_data ( id_ndamp_anom, tdamp(:,:,:,2), Time, is, js)
+if (id_teq        > 0) used = send_data ( id_teq,        teq,                  Time, is, js)
+if (id_tdt        > 0) used = send_data ( id_tdt,        sum(ttnd(:,:,:,:),4), Time, is, js)
+if (id_tdt_mean   > 0) used = send_data ( id_tdt_mean,   ttnd(:,:,:,1),        Time, is, js)
+if (id_tdt_anom   > 0) used = send_data ( id_tdt_anom,   ttnd(:,:,:,2),        Time, is, js)
+if (id_ndamp      > 0) used = send_data ( id_ndamp,      tdamp(:,:,:,1),       Time, is, js)
+if (id_ndamp_mean > 0) used = send_data ( id_ndamp_mean, tdamp(:,:,:,1),       Time, is, js)
+if (id_ndamp_anom > 0) used = send_data ( id_ndamp_anom, tdamp(:,:,:,2),       Time, is, js)
 
 !-----------------------------------------------------------------------
 !     -------- tracers -------
@@ -336,9 +344,15 @@ trdamp = 0.; if (trsink > 0.) trdamp = 1./trsink
 
 !     ----- register diagnostic fields -----
 
+! Equilibrium temp
 id_teq = register_diag_field ( mod_name, 'teq', axes(1:3), Time, &
   'equilibrium temperature', 'deg_K'   , &
   missing_value=missing_value, range=(/100.,400./) )
+
+! Newtonian damping rate
+id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
+  'newtonian damping coefficient', 'sec-1'   , &
+  missing_value=missing_value )
 
 id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
   'newtonian damping coefficient, mean component', 'sec-1'   , &
@@ -346,6 +360,11 @@ id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
 
 id_ndamp_anom = register_diag_field ( mod_name, 'ndamp_anom', axes(1:3), Time, &
   'newtonian damping coefficient, anomaly component', 'sec-1'   , &
+  missing_value=missing_value )
+
+! Rayleigh damping rate
+id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
+  'rayleigh damping coefficient', 'sec-1'   , &
   missing_value=missing_value )
 
 id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
@@ -356,6 +375,11 @@ id_rdamp_anom = register_diag_field ( mod_name, 'rdamp_anom', axes(1:3), Time, &
   'rayleigh damping coefficient, anomaly component', 'sec-1'   , &
   missing_value=missing_value )
 
+! Rate of temperature change
+id_tdt = register_diag_field ( mod_name, 'tdt', axes(1:3), Time, &
+  'temperature damping', 'deg_K/sec' ,    &
+  missing_value=missing_value     )
+
 id_tdt_mean = register_diag_field ( mod_name, 'tdt_mean', axes(1:3), Time, &
   'temperature damping, mean component', 'deg_K/sec' ,    &
   missing_value=missing_value     )
@@ -364,8 +388,18 @@ id_tdt_anom = register_diag_field ( mod_name, 'tdt_anom', axes(1:3), Time, &
   'temperature damping, anomaly component', 'deg_K/sec' ,    &
   missing_value=missing_value     )
 
+! Rate of wind change by sponge
 id_udt_spg = register_diag_field ( mod_name, 'udt_spg', axes(1:3), Time, &
   'zonal wind damping, sponge', 'm/s2',       &
+  missing_value=missing_value     )
+
+id_vdt_spg = register_diag_field ( mod_name, 'vdt_spg', axes(1:3), Time, &
+  'meridional wind damping, sponge', 'm/s2',       &
+  missing_value=missing_value     )
+
+! Rate of Rayleigh wind change
+id_udt = register_diag_field ( mod_name, 'udt', axes(1:3), Time, &
+  'zonal wind damping', 'm/s2',       &
   missing_value=missing_value     )
 
 id_udt_mean = register_diag_field ( mod_name, 'udt_mean', axes(1:3), Time, &
@@ -376,8 +410,8 @@ id_udt_anom = register_diag_field ( mod_name, 'udt_anom', axes(1:3), Time, &
   'zonal wind damping, anomaly component', 'm/s2',       &
   missing_value=missing_value     )
 
-id_vdt_spg = register_diag_field ( mod_name, 'vdt_spg', axes(1:3), Time, &
-  'meridional wind damping, sponge', 'm/s2',       &
+id_vdt = register_diag_field ( mod_name, 'vdt', axes(1:3), Time, &
+  'meridional wind damping', 'm/s2',  &
   missing_value=missing_value     )
 
 id_vdt_mean = register_diag_field ( mod_name, 'vdt_mean', axes(1:3), Time, &
@@ -419,7 +453,7 @@ module_is_initialized  = .true.
 
 !#######################################################################
 
- subroutine newtonian_damping_da ( Time, lat, ps, p_full, t, tdt, tdamp, teq, mask )
+ subroutine newtonian_damping ( Time, lat, ps, p_full, t, tdt, tdamp, teq, mask )
 
 !-----------------------------------------------------------------------
 !
@@ -623,7 +657,7 @@ do k=1,size(t,3)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
       ! Damp the mean (first dimension is longitudes)
-      t_mean(:) = sum(t(:,:,k),1)/size(t,1) ! mean
+      t_mean(:) = sum(t(:,:,k), 1)/size(t, 1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_mean(:)
       enddo
@@ -668,7 +702,7 @@ endif
 
 !-----------------------------------------------------------------------
 
-end subroutine newtonian_damping_da
+end subroutine newtonian_damping
 
 !#######################################################################
 

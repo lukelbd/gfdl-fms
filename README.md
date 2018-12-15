@@ -23,7 +23,7 @@ Note the ERA-Interim archive was produced with the Cy31r1 model release, i.e. 91
 | 266 | 400 | 100 (4) |
 
 ## Diagnostic table `diag_table`
-Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt "sections". Also note that **strings** must be in double quotes.
+Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt contiguous "file lines" and "field lines". Also note that **strings** must be in double quotes.
 
 ### Header lines
 

@@ -3,6 +3,7 @@
 /*.f90
 /*.nml
 !input*.nml
+!general*.nml
 !levels*.nml
 !forcing*.nml
 

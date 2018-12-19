@@ -91,11 +91,11 @@ real :: trdamp
 real, dimension(2) :: tktrop, tkbl, tkstrat, tkmeso, vkfric, vksponge
 
 integer :: id_teq, &
-  id_ndamp, id_rdamp, id_teq, id_tdt, id_udt, id_vdt, &
+  id_ndamp, id_rdamp, id_tdt, id_udt, id_vdt, id_uvdt, &
   id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
-  id_tdt_mean, id_tdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
+  id_tdt_mean, id_tdt_anom, id_uvdt_mean, id_uvdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
   id_tdt_diss, id_heat_diss, &
-  id_udt_spg, id_vdt_spg
+  id_uvdt_spg, id_udt_spg, id_vdt_spg
 
 real    :: missing_value = -1.e10
 character(len=14) :: mod_name = 'forcing'
@@ -163,8 +163,9 @@ utnd_spg = 0.0
 vtnd_spg = 0.0
 if (strat_sponge) then
   call sponge_layer ( ps, p_full, u, v, utnd_spg, vtnd_spg, mask=mask )
-  if (id_udt_spg > 0) used = send_data ( id_udt_spg, utnd_spg, Time, is, js)
-  if (id_vdt_spg > 0) used = send_data ( id_vdt_spg, vtnd_spg, Time, is, js)
+  if (id_uvdt_spg > 0) used = send_data(id_uvdt_spg, sqrt(utnd_spg**2 + vtnd_spg**2), Time, is, js)
+  if (id_udt_spg > 0)  used = send_data(id_udt_spg, utnd_spg, Time, is, js)
+  if (id_vdt_spg > 0)  used = send_data(id_vdt_spg, vtnd_spg, Time, is, js)
 endif
 
 !-----------------------------------------------------------------------
@@ -177,11 +178,11 @@ if (conserve_energy) then
   vtnd_diss = sum(vtnd,4)
   ttnd_diss = -((um+.5*utnd_diss*dt)*utnd_diss + (vm+.5*vtnd_diss*dt)*vtnd_diss)/cp_air
   ! outputs
-  if (id_tdt_diss  > 0) used = send_data ( id_tdt_diss, ttnd_diss, Time, is, js)
+  if (id_tdt_diss  > 0) used = send_data(id_tdt_diss, ttnd_diss, Time, is, js)
   if (id_heat_diss > 0) then
     pmass = p_half(:,:,2:)-p_half(:,:,:size(p_half,3)-1)
     diss_heat = cp_air/grav * sum( ttnd_diss*pmass, 3)
-    used = send_data ( id_heat_diss, diss_heat, Time, is, js)
+    used = send_data(id_heat_diss, diss_heat, Time, is, js)
   endif
 endif
 
@@ -198,25 +199,28 @@ call newtonian_damping ( Time, lat, ps, p_full, t, ttnd, tdamp, teq, mask )
 udt  = udt + utnd_spg + utnd(:,:,:,1) + utnd(:,:,:,2)
 vdt  = vdt + vtnd_spg + vtnd(:,:,:,1) + vtnd(:,:,:,2)
 
-if (id_udt        > 0) used = send_data ( id_udt_mean,   sum(utnd(:,:,:,:),4), Time, is, js)
-if (id_udt_mean   > 0) used = send_data ( id_udt_mean,   utnd(:,:,:,1),        Time, is, js)
-if (id_udt_anom   > 0) used = send_data ( id_udt_anom,   utnd(:,:,:,2),        Time, is, js)
-if (id_vdt        > 0) used = send_data ( id_vdt_mean,   sum(vtnd(:,:,:,:),4), Time, is, js)
-if (id_vdt_mean   > 0) used = send_data ( id_vdt_mean,   vtnd(:,:,:,1),        Time, is, js)
-if (id_vdt_anom   > 0) used = send_data ( id_vdt_anom,   vtnd(:,:,:,2),        Time, is, js)
-if (id_rdamp      > 0) used = send_data ( id_rdamp,      uvdamp(:,:,:,1),      Time, is, js)
-if (id_rdamp_mean > 0) used = send_data ( id_rdamp_mean, uvdamp(:,:,:,1),      Time, is, js)
-if (id_rdamp_anom > 0) used = send_data ( id_rdamp_anom, uvdamp(:,:,:,2),      Time, is, js)
+if (id_udt      > 0) used = send_data(id_udt,      sum(utnd,4),   Time, is, js)
+if (id_udt_mean > 0) used = send_data(id_udt_mean, utnd(:,:,:,1), Time, is, js)
+if (id_udt_anom > 0) used = send_data(id_udt_anom, utnd(:,:,:,2), Time, is, js)
+if (id_vdt      > 0) used = send_data(id_vdt,      sum(vtnd,4),   Time, is, js)
+if (id_vdt_mean > 0) used = send_data(id_vdt_mean, vtnd(:,:,:,1), Time, is, js)
+if (id_vdt_anom > 0) used = send_data(id_vdt_anom, vtnd(:,:,:,2), Time, is, js)
+if (id_uvdt      > 0) used = send_data(id_uvdt,      sqrt(sum(utnd,4)**2 + sum(vtnd,4)**2), Time, is, js)
+if (id_uvdt_mean > 0) used = send_data(id_uvdt_mean, sqrt(utnd(:,:,:,1)**2 + vtnd(:,:,:,1)**2), Time, is, js)
+if (id_uvdt_anom > 0) used = send_data(id_uvdt_anom, sqrt(utnd(:,:,:,2)**2 + vtnd(:,:,:,2)**2), Time, is, js)
+if (id_rdamp      > 0) used = send_data(id_rdamp,      uvdamp(:,:,:,1), Time, is, js)
+if (id_rdamp_mean > 0) used = send_data(id_rdamp_mean, uvdamp(:,:,:,1), Time, is, js)
+if (id_rdamp_anom > 0) used = send_data(id_rdamp_anom, uvdamp(:,:,:,2), Time, is, js)
 
 tdt = tdt + ttnd_diss + ttnd(:,:,:,1) + ttnd(:,:,:,2) ! mean and anomaly components
 
-if (id_teq        > 0) used = send_data ( id_teq,        teq,                  Time, is, js)
-if (id_tdt        > 0) used = send_data ( id_tdt,        sum(ttnd(:,:,:,:),4), Time, is, js)
-if (id_tdt_mean   > 0) used = send_data ( id_tdt_mean,   ttnd(:,:,:,1),        Time, is, js)
-if (id_tdt_anom   > 0) used = send_data ( id_tdt_anom,   ttnd(:,:,:,2),        Time, is, js)
-if (id_ndamp      > 0) used = send_data ( id_ndamp,      tdamp(:,:,:,1),       Time, is, js)
-if (id_ndamp_mean > 0) used = send_data ( id_ndamp_mean, tdamp(:,:,:,1),       Time, is, js)
-if (id_ndamp_anom > 0) used = send_data ( id_ndamp_anom, tdamp(:,:,:,2),       Time, is, js)
+if (id_teq        > 0) used = send_data(id_teq,        teq,            Time, is, js)
+if (id_tdt        > 0) used = send_data(id_tdt,        sum(ttnd,4),    Time, is, js)
+if (id_tdt_mean   > 0) used = send_data(id_tdt_mean,   ttnd(:,:,:,1),  Time, is, js)
+if (id_tdt_anom   > 0) used = send_data(id_tdt_anom,   ttnd(:,:,:,2),  Time, is, js)
+if (id_ndamp      > 0) used = send_data(id_ndamp,      tdamp(:,:,:,1), Time, is, js)
+if (id_ndamp_mean > 0) used = send_data(id_ndamp_mean, tdamp(:,:,:,1), Time, is, js)
+if (id_ndamp_anom > 0) used = send_data(id_ndamp_anom, tdamp(:,:,:,2), Time, is, js)
 
 !-----------------------------------------------------------------------
 !     -------- tracers -------
@@ -351,28 +355,28 @@ id_teq = register_diag_field ( mod_name, 'teq', axes(1:3), Time, &
 
 ! Newtonian damping rate
 id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
-  'newtonian damping coefficient', 'sec-1'   , &
+  'thermal damping coefficient', 'sec-1'   , &
   missing_value=missing_value )
 
 id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
-  'newtonian damping coefficient, mean component', 'sec-1'   , &
+  'thermal damping coefficient, mean component', 'sec-1'   , &
   missing_value=missing_value )
 
 id_ndamp_anom = register_diag_field ( mod_name, 'ndamp_anom', axes(1:3), Time, &
-  'newtonian damping coefficient, anomaly component', 'sec-1'   , &
+  'thermal damping coefficient, anomaly component', 'sec-1'   , &
   missing_value=missing_value )
 
 ! Rayleigh damping rate
 id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
-  'rayleigh damping coefficient', 'sec-1'   , &
+  'frictional damping coefficient', 'sec-1'   , &
   missing_value=missing_value )
 
 id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
-  'rayleigh damping coefficient, mean component', 'sec-1'   , &
+  'frictional damping coefficient, mean component', 'sec-1'   , &
   missing_value=missing_value )
 
 id_rdamp_anom = register_diag_field ( mod_name, 'rdamp_anom', axes(1:3), Time, &
-  'rayleigh damping coefficient, anomaly component', 'sec-1'   , &
+  'frictional damping coefficient, anomaly component', 'sec-1'   , &
   missing_value=missing_value )
 
 ! Rate of temperature change
@@ -389,46 +393,64 @@ id_tdt_anom = register_diag_field ( mod_name, 'tdt_anom', axes(1:3), Time, &
   missing_value=missing_value     )
 
 ! Rate of wind change by sponge
+id_uvdt_spg = register_diag_field ( mod_name, 'uvdt_spg', axes(1:3), Time, &
+  'sponge wind damping', 'm/s2',       &
+  missing_value=missing_value     )
+
 id_udt_spg = register_diag_field ( mod_name, 'udt_spg', axes(1:3), Time, &
-  'zonal wind damping, sponge', 'm/s2',       &
+  'sponge zonal wind damping', 'm/s2',       &
   missing_value=missing_value     )
 
 id_vdt_spg = register_diag_field ( mod_name, 'vdt_spg', axes(1:3), Time, &
-  'meridional wind damping, sponge', 'm/s2',       &
+  'sponge meridional wind damping', 'm/s2',       &
   missing_value=missing_value     )
 
-! Rate of Rayleigh wind change
+! Frictional damping of wind
+! Total
+id_uvdt = register_diag_field ( mod_name, 'uvdt', axes(1:3), Time, &
+  'frictional wind damping', 'm/s2',       &
+  missing_value=missing_value     )
+
+id_uvdt_mean = register_diag_field ( mod_name, 'uvdt_mean', axes(1:3), Time, &
+  'frictional wind damping, mean component', 'm/s2',       &
+  missing_value=missing_value     )
+
+id_uvdt_anom = register_diag_field ( mod_name, 'uvdt_anom', axes(1:3), Time, &
+  'frictional wind damping, anomaly component', 'm/s2',       &
+  missing_value=missing_value     )
+
+! And directional
 id_udt = register_diag_field ( mod_name, 'udt', axes(1:3), Time, &
-  'zonal wind damping', 'm/s2',       &
+  'frictional zonal wind damping', 'm/s2',       &
   missing_value=missing_value     )
 
 id_udt_mean = register_diag_field ( mod_name, 'udt_mean', axes(1:3), Time, &
-  'zonal wind damping, mean component', 'm/s2',       &
+  'frictional zonal wind damping, mean component', 'm/s2',       &
   missing_value=missing_value     )
 
 id_udt_anom = register_diag_field ( mod_name, 'udt_anom', axes(1:3), Time, &
-  'zonal wind damping, anomaly component', 'm/s2',       &
+  'frictional zonal wind damping, anomaly component', 'm/s2',       &
   missing_value=missing_value     )
 
 id_vdt = register_diag_field ( mod_name, 'vdt', axes(1:3), Time, &
-  'meridional wind damping', 'm/s2',  &
+  'frictional meridional wind damping', 'm/s2',  &
   missing_value=missing_value     )
 
 id_vdt_mean = register_diag_field ( mod_name, 'vdt_mean', axes(1:3), Time, &
-  'meridional wind damping, mean component', 'm/s2',  &
+  'frictional meridional wind damping, mean component', 'm/s2',  &
   missing_value=missing_value     )
 
 id_vdt_anom = register_diag_field ( mod_name, 'vdt_anom', axes(1:3), Time, &
-  'meridional wind damping, anomaly component', 'm/s2',  &
+  'frictional meridional wind damping, anomaly component', 'm/s2',  &
   missing_value=missing_value     )
 
 if (conserve_energy) then
   id_tdt_diss = register_diag_field ( mod_name, 'tdt_diss_rdamp', axes(1:3), &
-    Time, 'dissipative heating from rayleigh damping', 'deg_K/sec',&
+    Time, 'dissipative heating from frictional damping', 'deg_K/sec',&
     missing_value=missing_value     )
 
   id_heat_diss = register_diag_field ( mod_name, 'diss_rdamp', axes(1:2), &
-    Time, 'integrated dissipative heating for rayleigh damping', 'W/m2')
+    Time, 'integrated dissipative heating for frictional damping', 'W/m2')
 endif
 
 module_is_initialized  = .true.

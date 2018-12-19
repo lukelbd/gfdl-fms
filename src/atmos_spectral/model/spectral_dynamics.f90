@@ -1543,23 +1543,29 @@ if(id_slp > 0) then
 endif
 
 if(interval_alarm(Time, Time_step, Alarm_time, Alarm_interval)) then
-  call global_integrals(Time, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid(:,:,:,time_level,:))
+  call global_integrals(Time, Time_step, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid(:,:,:,time_level,:))
 endif
 
 return
 end subroutine spectral_diagnostics
 !===================================================================================
-subroutine global_integrals(Time, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid)
-type(time_type), intent(in) :: Time
+subroutine global_integrals(Time, Time_step, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid)
+type(time_type), intent(in) :: Time, Time_step
 real, intent(in), dimension(is:ie, js:je)                          :: p_surf
 real, intent(in), dimension(is:ie, js:je, num_levels)              :: u_grid, v_grid, t_grid, wg_full
 real, intent(in), dimension(is:ie, js:je, num_levels, num_tracers) :: tr_grid
+real :: dx, dt
+integer :: days_dt, seconds_dt
 integer :: year, month, days, hours, minutes, seconds
 character(len=4), dimension(12) :: month_name
 
 month_name=(/' Jan',' Feb',' Mar',' Apr',' May',' Jun',' Jul',' Aug',' Sep',' Oct',' Nov',' Dec'/)
 
-if(mpp_pe() == mpp_root_pe()) then
+! tried to print CFL num here, but model run in parallel, so impossible to get
+! entire globe (misleading name).
+! the RESTART files contain all data, but not sure how to access it; everything
+! else seems to be done in parallel
+if(mpp_pe() == mpp_root_pe()) then ! if on the 'root' parallel process or something
   if(get_calendar_type() == NO_CALENDAR) then
     call get_time(Time, seconds, days)
     write(*,100) days, seconds
@@ -1567,9 +1573,16 @@ if(mpp_pe() == mpp_root_pe()) then
     call get_date(Time, year, month, days, hours, minutes, seconds)
     write(*,200) year, month_name(month), days, hours, minutes, seconds
   endif
+  ! dx = radius*pi/size(u_grid, 2) ! divide by number of latitudes
+  ! call get_time(Time_step, seconds_dt, days_dt)
+  ! dt = 86400.0*float(days_dt) + float(seconds_dt)
+  ! write(*,300) maxval(u_grid)/(dx/dt)
+  ! write(*,400) size(u_grid,1), size(u_grid,2), size(u_grid,3), dx, dt
 endif
 100 format(' Integration completed through',i6,' days',i6,' seconds')
 200 format(' Integration completed through',i5,a4,i3,2x,i2,':',i2,':',i2)
+! 300 format(' Approx CFL number ',f10.3)
+! 400 format(' Stats',i6,i6,i6,f10.3,f10.3)
 
 end subroutine global_integrals
 !===================================================================================

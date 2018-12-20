@@ -98,10 +98,10 @@ Note for all damping parameters, a positive value means seconds, negative means 
 | `no_forcing`   | `.false.`    | all        | Turn off forcing altogether, same as setting each damping timescale to zero
 | `ndamp_decomp` | `.false.`     | all        | Apply thermal damping separately for mean and anomaly components?
 | `rdamp_decomp` | `.false.`    | all        | Apply mechanical damping separately for mean and anomaly components?
-| `strat_vtx`    | `.true.`     | `pk`, `da` | Apply polar vortex?
-| `strat_sponge` | `.true.`     | `pk`, `da` | Toggle sponge layer above 1hPa?
-| `strat_mode`   | `'hs'`       | all        | One of `'hs'`, `'pk'`, or `'da'`
-| `strat_damp`   | `'constant'` | `da`       | One of `'constant'` or `'linear'`
+| `strat_vtx`    | `.true.`     | `pk`, `dbt` | Apply polar vortex?
+| `strat_sponge` | `.true.`     | `pk`, `dbt` | Toggle sponge layer above 1hPa?
+| `strat_mode`   | `'hs'`       | all        | One of `'hs'`, `'pk'`, or `'dbt'`
+| `strat_damp`   | `'constant'` | `dbt`       | One of `'constant'` or `'linear'`
 | `t_zero`       | `315`        | all        | Equilibrium temperature for the equator at the surface
 | `t_strat`      | `200`        | all        | Minimum equilibrium temperature in summer stratosphere
 | `delh`         | `60`         | all        | Equator-pole difference in surface equilibrium temperature
@@ -109,17 +109,17 @@ Note for all damping parameters, a positive value means seconds, negative means 
 | `eps`          | `0`          | all        | Applies seasonality, where positive `N` reduces the equator-pole difference in surface equilibrium temperature by `N` Kelvin in the northern hemisphere, and increases it by that much in the southern hemisphere
 | `sigma_b`      | `0.7`        | all        | Top of "boundary layer" in sigma coordinates
 | `z_pkswitch`   | `16`         | `pk`       | Height (in km) above which `pk` stratosphere is applied
-| `z_kdepth`     | `5`          | `da`       | Depth (in km) of transition region between `ktrop` and `kstrat`
-| `lat_trop_ref` | `0`          | `da`       | Latitude to which the U.S. standard atmosphere heights correspond exactly; heights will be perturbed to follow the equilibrium tropopause at other latitudes         |
-| `p_sponge`     | `1.0`        | `pk`, `da` | Level (in hPa) above which sponge layer applies
-| `p_logeval`    | `200`        | `da`       | Pressure at which we evaluate the logarithm in the `hs` equation for equilibrium temperature, in order to solve for the "equilibrium tropopause" height analytically
-| `vtx_edge`     | `50`         | `pk`, `da` | "Edge" of the polar vortex, in degrees latitude
-| `vtx_wid`      | `20`         | `pk`, `da` | "Width" of the polar vortex-to-U.S. standard atmosphere stratosphere transition region
-| `vtx_gam`      | `2`          | `pk`, `da` | Lapse rate (in K/km) of polar vortex
-| `ksponge`      | `-0.5`       | `pk`, `da` | Maximum mechanical damping rate for winds in sponge layer, realized at the top of the model atmosphere
+| `z_kdepth`     | `5`          | `dbt`       | Depth (in km) of transition region between `ktrop` and `kstrat`
+| `lat_trop_ref` | `0`          | `dbt`       | Latitude to which the U.S. standard atmosphere heights correspond exactly; heights will be perturbed to follow the equilibrium tropopause at other latitudes         |
+| `p_sponge`     | `1.0`        | `pk`, `dbt` | Level (in hPa) above which sponge layer applies
+| `p_logeval`    | `200`        | `dbt`       | Pressure at which we evaluate the logarithm in the `hs` equation for equilibrium temperature, in order to solve for the "equilibrium tropopause" height analytically
+| `vtx_edge`     | `50`         | `pk`, `dbt` | "Edge" of the polar vortex, in degrees latitude
+| `vtx_wid`      | `20`         | `pk`, `dbt` | "Width" of the polar vortex-to-U.S. standard atmosphere stratosphere transition region
+| `vtx_gam`      | `2`          | `pk`, `dbt` | Lapse rate (in K/km) of polar vortex
+| `ksponge`      | `-0.5`       | `pk`, `dbt` | Maximum mechanical damping rate for winds in sponge layer, realized at the top of the model atmosphere
 | `ktrop`        | `-40`        | all        | Free-troposphere thermal damping timescale
 | `kstrat`       | `-20`        | all        | Lower stratosphere thermal damping timescale, or constant damping timescale for `hs` stratosphere
-| `kmeso`        | `-4`         | `pk`, `da` | Upper-stratosphere thermal damping timescale
+| `kmeso`        | `-4`         | `pk`, `dbt` | Upper-stratosphere thermal damping timescale
 | `kbl`                | `-10`    | all | Maximum boundary layer damping timescale, realized at the surface on the equator
 | `kf`                 | `-1`     | all | Maximum mechanical (friction) damping of winds in the boundary layer, realized at the surface
 | `do_conserve_energy` | `.true.` | all | Whether to increase thermal energy in response to kinetic energy lost to dissipation of the winds

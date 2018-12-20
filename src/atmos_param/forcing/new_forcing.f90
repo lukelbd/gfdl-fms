@@ -5,7 +5,7 @@ module forcing_mod
 !          Luke Davis (lukelbd@gmail.com)
 ! This forcing module optionally allows for Polvani-Kushner setup instead
 ! of the conventional Held-Suarez default, and adds sponge layer to upper stratosphere.
-! Also adds new 'da' forcing mode, where stratosphere is built by special
+! Also adds new 'dbt' forcing mode, where stratosphere is built by special
 ! US standard atmosphere-like series of constant lapse rates relative to tropopause
 ! height, with a modified 'standard atmosphere' for vortex region.
 ! Note: Dimensions of arrays are longitude by <processor latitudes> by height
@@ -590,7 +590,7 @@ do k=1,size(t,3)
       teq(:,:,k) = max( t_hs(:,:,k), t_strat_usstd )
     endwhere
 
-  else if (trim(strat_mode) == 'da') then
+  else if (trim(strat_mode) == 'dbt') then
     !     ----- Davis et al. -----
     ! Similar, but strat profile conforms to tropopause
     call us_tstd_modified( t_strat, vtx_gam, z_trop_ref, z_trop(:,:), z_full(:,:), t_std_tmp(:,:), t_pv_tmp(:,:) )
@@ -646,7 +646,7 @@ do k=1,size(t,3)
         tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
       endwhere
 
-    else if (trim(strat_mode) == 'da') then
+    else if (trim(strat_mode) == 'dbt') then
       !     ----- Davis et al. -----
       ! Again, conforms to tropopause
       ! If loops not allowed inside where loop, so do it here

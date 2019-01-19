@@ -53,13 +53,12 @@
   strat_vtx       = .true.,     ! (pk/dbt) turn on and off the polar vortex
   strat_sponge    = .true.,     ! (pk/dbt) turn on sponge
   strat_damp      = 'constant', ! (dbt) linear: transition from kstrat at tropopause to kmeso at TOA linearly; constant: use kstrat everywhere in above tropopause
-  ndamp_decomp    = .true.,     ! (dbt) separate zonal mean/anomaly components of thermal damping?
-  rdamp_decomp    = .false.,    ! (dbt) same for friction damping?
   t_zero          = 315.,       ! temp at equator surface
   t_strat         = 200.,       ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
   delh            = 60.,        ! equator-pole temp contrast
   delv            = 10.,        ! lapse rate scaling, probably should be left alone
   eps             = 0.,         ! seasons; delh=delh+eps in north hemisphere, delh=delh-eps in south hemisphere
+  exp_h           = 0,          ! positive number shifts baroclinic zone poleward from hs, negative equatorward
   exp_b           = 4,          ! cosine latitude exponent for boundary layer damping equation; Shneider uses 8, Held-Suarez 4
   sigma_b         = 0.7,        ! boundary level; below which friction and elevated thermal damping start
   z_pkswitch      = 16.,        ! (pk) flat level above which Polvani-Kushner strat begins (km)

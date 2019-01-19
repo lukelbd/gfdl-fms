@@ -38,13 +38,14 @@ public :: forcing, forcing_init
 !-----------------------------------------------------------------------
 !     ----- namelist -----
 
-
 character(len=64) :: strat_mode = 'hs', strat_damp = 'constant'
-logical :: no_forcing   = .false., rdamp_decomp = .false., ndamp_decomp = .false.
+logical :: no_forcing   = .false.
 logical :: strat_sponge = .true.,  strat_vtx    = .true.
+logical :: ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 
 real, parameter :: H = 7.0 ! for calculation below
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
+integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
 real :: sigma_b  = 0.7
 real :: t_zero = 315., t_strat_usstd = 216.65, t_strat = 200.0
 real :: delh   = 60.0, delv          = 10.0,   eps     = 0.0
@@ -53,11 +54,12 @@ real :: p_ref    = 1000.0, p_sponge = 0.5,  p_logeval = 200.0
 real :: z_pkswitch = 16.0, z_kdepth = 50.0 ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
 real :: lat_trop_ref = 0
 
-! namelist can specify just *one* value, and it will be
-! inserted in first position. 
-! damping rates for mean (index 1) and anomaly (index 2) components
+! Namelist can specify just *one* value, and it will be
+! inserted in first position.
+! Damping rates for mean (index 1) and anomaly (index 2) components
 ! can specify in namelist e.g. 'ktrop=1,' or 'ktrop=1,2'; in the former
-! case we just set the *mean* damping rate, and default value remains for anomaly
+! case we just set the *mean* damping rate, and default value remains for
+! anomaly.
 real, parameter :: fill_value = 999. ! use this as dummy
 real, dimension(2) :: kbl     = fill_value
 real, dimension(2) :: ktrop   = fill_value
@@ -73,9 +75,9 @@ real :: trsink = -4.     ! damping time for tracer
 
 !-----------------------------------------------------------------------
 
-namelist /forcing_nml/  no_forcing, rdamp_decomp, ndamp_decomp, &
+namelist /forcing_nml/  no_forcing, &
   strat_sponge, strat_vtx, strat_mode, strat_damp, &
-  t_zero, t_strat, delh, delv, eps, &
+  t_zero, t_strat, exp_h, delh, delv, eps, &
   lat_trop_ref, &
   vtx_edge, vtx_wid, vtx_gam, &
   exp_b, sigma_b, p_sponge, p_logeval, z_pkswitch, z_kdepth, &
@@ -303,12 +305,36 @@ if (ksponge(1)==fill_value) ksponge(1) = -2.
 
 !     ----- if one number specified in namelist, use it for *both* components -----
 
-if (kbl(2)==fill_value)     kbl(2)     = kbl(1)
-if (ktrop(2)==fill_value)   ktrop(2)   = ktrop(1)
-if (kstrat(2)==fill_value)  kstrat(2)  = kstrat(1)
-if (kmeso(2)==fill_value)   kmeso(2)   = kmeso(1)
-if (kfric(2)==fill_value)   kfric(2)   = kfric(1)
-if (ksponge(2)==fill_value) ksponge(2) = ksponge(1)
+if (kbl(2)==fill_value) then
+  kbl(2) = kbl(1)
+else
+  ndamp_decomp = .true.
+end if
+if (ktrop(2)==fill_value) then
+  ktrop(2) = ktrop(1)
+else
+  ndamp_decomp = .true.
+end if
+if (kstrat(2)==fill_value) then
+  kstrat(2) = kstrat(1)
+else
+  ndamp_decomp = .true.
+end if
+if (kmeso(2)==fill_value) then
+  kmeso(2) = kmeso(1)
+else
+  ndamp_decomp = .true.
+end if
+if (kfric(2)==fill_value) then
+  kfric(2) = kfric(1)
+else
+  rdamp_decomp = .true.
+end if
+if (ksponge(2)==fill_value) then
+  ksponge(2) = ksponge(1)
+else
+  sponge_decomp = .true.
+end if
 
 !     ----- compute coefficients -----
 
@@ -502,7 +528,7 @@ real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
 integer, dimension(size(t,1),size(t,2)) :: trop_idx
 
 real, dimension(size(t,1),size(t,2)) :: &
-  w_vtx, cos_lat_2, &
+  w_vtx, cos_lat_2, t_surf_lat, &
   t_surf, t_std_tmp, t_pv_tmp, &
   s, z_full, z_trop, p_norm, p_trop, p_inv
 real, dimension(size(t,2)) :: t_mean
@@ -529,17 +555,24 @@ pexp           = rdgas*vtx_gam*1.0e-3/grav
 
 !-----------------------------------------------------------------------
 ! Misc
-! first surface temp and damping
-t_surf(:,:) = t_zero - delh*sin(lat(:,:))**2 - eps*sin(lat(:,:))
+! Surface temp profile, default configuration (exp_h .eq. 0) and poleward shift
+if (exp_h .ge. 0) then
+  t_surf_lat(:,:) = sin(lat(:,:))**(2 + exp_h)
+! Equatorward shift
+else
+  t_surf_lat(:,:) = 1 - cos(lat(:,:))**(2 - exp_h)
+end if
+t_surf(:,:) = t_zero - delh*t_surf_lat(:,:) - eps*sin(lat(:,:))
+! Surface damping
 do l=1,2
   tksurf_decomp(:,:,l) = (tkbl(l)-tktrop(l))*cos(lat(:,:))**exp_b
 enddo
-! vortex weighting
+! Vortex weighting
 w_vtx(:,:) = 0.0 ! standard atmosphere everywhere
 if (strat_vtx) then
   w_vtx(:,:) = 0.5*(1.0 + tanh((lat(:,:) - abs(vtx_edge_r))/vtx_wid_r)) ! vortex in northern hemisphere
 endif
-! this was previously below, but is *not* part of the held-suarez specification
+! This was previously below, but is *not* part of the held-suarez specification
 ! t_const(:,:) = t_strat - eps*sin(lat(:,:))
 
 !-----------------------------------------------------------------------
@@ -553,9 +586,9 @@ p_trop(:,:) = p0*( t_strat / (t_surf(:,:) - delv*log(plog/p0)*cos_lat_2(:,:)) )*
 p_trop_ref  = p0*( t_strat / (t_zero - delh*sin(lat_trop_ref_r)**2 - eps*sin(lat_trop_ref_r) &
                              - delv*log(plog/p0)*cos(lat_trop_ref_r)**2) )**(1.0/kappa)
 
-z_trop(:,:)   = -H*log(p_trop(:,:)/p0)
-z_trop_ref    = -H*log(p_trop_ref/p0)
-p_pkswitch    = p0*exp(-z_pkswitch/H)
+z_trop(:,:) = -H*log(p_trop(:,:)/p0)
+z_trop_ref  = -H*log(p_trop_ref/p0)
+p_pkswitch  = p0*exp(-z_pkswitch/H)
 
 ! print *, 'Tropopause reference:'
 ! print *, int(p_trop_ref/100.0)
@@ -640,7 +673,7 @@ do k=1,size(t,3)
         tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s(:,:)-sigma_b)/(1.0-sigma_b)
       elsewhere (z_full(:,:) < z_pkswitch)
         tdamp(:,:,k,l) = tktrop(l)
-      elsewhere (z_full(:,:) >= z_pkswitch .and. z_full(:,:) < z_pkswitch+z_kdepth)
+      elsewhere (z_full(:,:) >= z_pkswitch .and. z_full(:,:) < z_pkswitch + z_kdepth)
         tdamp(:,:,k,l) = tktrop(l) - (tktrop(l)-tkstrat(l))*(z_full(:,:)-z_pkswitch)/z_kdepth
       elsewhere
         tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
@@ -672,10 +705,13 @@ do k=1,size(t,3)
     !-----------------------------------------------------------------------
     !     ----- Increment Temperature -----
     if (.not. ndamp_decomp) then
-      ! Damp the full temperature, then exit
+      ! Damp the *full* temperature, then exit
+      ! note: Damping resides in the 'mean' slot, even though it is the full
+      ! damping! We just do this to avoid decomposition (and save a bit of time)
+      ! unless it's really necessary.
       tdt(:,:,k,1)   = -tdamp(:,:,k,1)*(t(:,:,k) - teq(:,:,k))
       tdt(:,:,k,2)   = 0.0
-      tdamp(:,:,k,2) = 0.0
+      tdamp(:,:,k,2) = tdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
       ! Damp the mean (first dimension is longitudes)
@@ -766,8 +802,8 @@ do k=1,size(u,3)
       vdt(:,:,k,1)    = -uvdamp(:,:,k,1)*v(:,:,k)
       udt(:,:,k,2)    = 0.0
       vdt(:,:,k,2)    = 0.0
-      uvdamp(:,:,k,2) = 0.0
-      uvdamp(:,:,k,2) = 0.0
+      uvdamp(:,:,k,2) = uvdamp(:,:,k,1)
+      uvdamp(:,:,k,2) = uvdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
       ! Damp the means

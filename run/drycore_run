@@ -24,7 +24,7 @@ export PATH="$mpibin:$PATH" # add mpi executable to path
 ################################################################################
 # Simple function for reading values set in namelist
 ################################################################################
-function Parse() {
+nml_parse() {
   [ ! -r "$cwd/input.nml" ]  && echo "Error: input.nml file not found."  && exit 1
   cat input.nml | sed 's/!.*//g' | grep "$1" | cut -d= -f2 | tr -d "\t ,'\""
 }
@@ -37,7 +37,7 @@ cores=4
 tstart=0
 newexp=false
 resume=false
-days=$(Parse days) # number of days in each block
+days=$(nml_parse days) # number of days in each block
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
     --newexp)     newexp=true       ;;
@@ -57,11 +57,11 @@ done
 # You should copy the exe from whichever compile script
 fms=$cwd/fms.x                   # model executable
 mppnccombine=$cwd/mppnccombine.x # netcdf combine executable
-[ ! -x $fms ]  && echo "Error: The executable $fms is missing." && exit 1
-[ ! -x $mppnccombine ] && echo "Error: The executable $mppnccombine is missing." && exit 1
+! [ -x $fms ]  && echo "Error: The executable $fms is missing." && exit 1
+! [ -x $mppnccombine ] && echo "Error: The executable $mppnccombine is missing." && exit 1
 # Exit from script if directory already exists
 $newexp && [ -d $expdir ] && echo "Error: Working directory already exists. Continuing..." && exit 1
-if [ ! -d $expdir ]; then
+if ! [ -d $expdir ]; then
   mkdir $expdir # make directory
   [ $? -ne 0 ] && echo "Error: Could not create experiment directory \"$expdir\"." && exit 1
 fi
@@ -74,19 +74,19 @@ fi
 # https://unix.stackexchange.com/questions/76481/cant-indent-heredoc-to-match-nestings-indent
 ################################################################################
 # Takes two arguments: 1) the working directory, and 2) the iteration mode
-function Setup() {
+dir_setup() {
   # Set up working directory, and move there
   # Action depends on settings
   wdir="$1" # where to move files
-  [ $# -ne 1 ] && echo "Error: Setup() functions requires exactly 1 argument." && exit 1
-  if [ ! -d $wdir ]; then
+  [ $# -ne 1 ] && echo "Error: dir_setup() functions requires exactly 1 argument." && exit 1
+  if ! [ -d $wdir ]; then
     # Directory does not exist, just create if from scratch
     resume=false
     echo "Setting up working directory ${wdir##*/}..."
   elif $resume; then
     # Directory exists
     # Check if this directory contains finished results
-    if [ ! -z "$(\ls $wdir/RESTART 2>/dev/null)" ]; then # need to check RESTART folder is non-empty
+    if ! [ -z "$(\ls $wdir/RESTART 2>/dev/null)" ]; then # need to check RESTART folder is non-empty
       echo "Working directory ${wdir##*/} contains completed integration. Cancelling..." && return 1
     fi
     # If not, we are "resuming" the experiment run at this timestep
@@ -107,13 +107,14 @@ function Setup() {
   mkdir INPUT       # model reads from this
   touch field_table # just put empty file, if want no tracers
   # Copy files over
-  [ ! -r "$cwd/input.nml" ]  && echo "Error: input.nml file not found."  && exit 1
-  [ ! -r "$cwd/diag_table" ] && echo "Error: diag_table file not found." && exit 1
-  cp $cwd/input.nml  ./
+  ! [ -r "$cwd/input.nml" ]  && echo "Error: input.nml file not found."  && exit 1
+  ! [ -r "$cwd/diag_table" ] && echo "Error: diag_table file not found." && exit 1
+  # cp $cwd/input.nml  ./
+  cat $cwd/input.nml | sed 's/!.*//g' | sed 's/[ \t]*$//g' | sed $'/^[ \t]*$/d' >./input.nml
   cp $cwd/diag_table ./
-  topo=$(Parse "topography_option") # use helper function
+  topo=$(nml_parse topography_option) # use helper function
   if [ "$topo" == "input" ]; then
-    [ ! -r $cwd/topography.data.nc ] && echo "Error: Topography file not available." && exit 1
+    ! [ -r $cwd/topography.data.nc ] && echo "Error: Topography file not available." && exit 1
     cp $cwd/topography.data.nc INPUT
   fi
   return 0
@@ -122,9 +123,9 @@ function Setup() {
 ################################################################################
 # Function for running the next model step from a previous step
 ################################################################################
-function Run() {
+driver() {
   local rdir=$1 # the restart direcotry
-  [ $# -ne 1 ] && echo "Error: Run() function takes exactly 1 argument." && exit 1
+  [ $# -ne 1 ] && echo "Error: driver() function takes exactly 1 argument." && exit 1
   t=$(date +%s)
   echo "Running model..."
   # Use mpirun to run model in parallel (note mpirun must be on path)
@@ -149,7 +150,7 @@ function Run() {
   done
   echo "Time for combining files: $(($(date +%s) - $t))s."
   # Initialize directory for output
-  [ ! -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
+  ! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
   ncfiles=(*.nc) # each output file
   # Remove some files
   [ -r INPUT/topography.data.nc ] && rm INPUT/topography.data.nc # remove topography
@@ -162,11 +163,11 @@ function Run() {
 # fms can read them and continue iteration from a previous state.
 ################################################################################
 # Take one argument: directory where restart files exist
-function Restart() {
+copy_restart() {
   # Copy over relevant restart files for exp type; if missing, raise error
   local rdir=$1 # the restart direcotry
-  [ $# -ne 1 ] && echo "Error: Restart() function takes exactly 1 argument." && exit 1
-  if [ ! -d "$rdir" ] || [ ! -d "$rdir/RESTART" ] || [ -z "$(ls $rdir/RESTART/* 2>/dev/null)" ]; then
+  [ $# -ne 1 ] && echo "Error: copy_restart() function takes exactly 1 argument." && exit 1
+  if ! [ -d "$rdir" ] || ! [ -d "$rdir/RESTART" ] || [ -z "$(ls $rdir/RESTART/* 2>/dev/null)" ]; then
     echo "Error: Restart directory $rdir/RESTART does not exist, or is empty." && exit 1
   fi
   resfiles="atmos_model.res atmosphere.res.nc spectral_dynamics.res.nc"
@@ -174,7 +175,7 @@ function Restart() {
   # resfiles="atmos_model.res atmos_tracers.res.nc bgrid_prog_var.res.nc" # brid type
   echo "Moving restart files from ${rdir##*/}/RESTART to ${PWD##*/}/INPUT..."
   for file in $resfiles; do
-    [ ! -r $rdir/RESTART/$file ] && echo "Error: Missing restart file ${rdir##*/}/RESTART/${file}." && exit 1
+    ! [ -r $rdir/RESTART/$file ] && echo "Error: Missing restart file ${rdir##*/}/RESTART/${file}." && exit 1
     cp $rdir/RESTART/$file INPUT/$file
   done
 }
@@ -196,24 +197,24 @@ while [ $nday -le $tend ]; do
   # Optionally use the end of other control runs to reduce spinup time
   rdir=$expdir/d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
   cdir=$expdir/d$(printf "%04d" $cday)-d$(printf "%04d" $nday)
-  if [ ! -z $roverride ]; then coldstart=false
-    if [[ ! $roverride =~ d.*-d.* ]]; then
+  if ! [ -z $roverride ]; then coldstart=false
+    if ! [[ $roverride =~ d.*-d.* ]]; then
       echo "Override: Using final day from \"$roverride\" for restart files."
       roverride=($roverride/d*-d*); rdir="${roverride[-1]}" # pick last one; the glob expansion will return a sorted list of names
     else
       echo "Override: Using restart files from \"$roverride\"."
       rdir="$roverride" # use specific day sequence
     fi; unset roverride # only ever use this on first 'day' of a new experiment; for subsequent days, continue from earlier day block
-    [ ! -d $rdir ] && echo "Error: Override restart directory \"$rdir\" does not exist." && exit 1
+    ! [ -d $rdir ] && echo "Error: Override restart directory \"$rdir\" does not exist." && exit 1
   fi
-  Setup $cdir # sets up working directory, cd into it
+  dir_setup $cdir # sets up working directory, cd into it
   if [ $? -eq 0 ]; then # setup returns 1 if directory is present and 'resume' option is set
     if ! $coldstart || [ $cday -gt 0 ]; then
-      Restart $rdir # put files into RESTART directory
+      copy_restart $rdir # put files into RESTART directory
     else
       echo "Cold start."
     fi
-    Run $rdir # run model
+    driver $rdir # run model
   fi
   # Step things forward, for next iteration
   pday=$cday

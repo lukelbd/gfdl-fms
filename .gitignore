@@ -1,16 +1,9 @@
-# Ignore top-level fortran files (used for learning purposes) #
-###############################################################
-/*.f90
-/*.nml
-!input*.nml
-!general*.nml
-!levels*.nml
-!forcing*.nml
-
 # Ignore executables #
 ######################
 *.x
-run/bin
+tests
+trash
+run/bin*
 
 # VIM extras #
 ##############

@@ -6,6 +6,8 @@
   strat_vtx       = .true.,     ! (pk/dbt) turn on and off the polar vortex
   strat_sponge    = .true.,     ! (pk/dbt) turn on sponge
   strat_damp      = 'constant', ! (dbt) linear: transition from kstrat at tropopause to kmeso at TOA linearly; constant: use kstrat everywhere in
+  surf_schneider  = .false.,    ! conserve mean surface temp when delh is changed?
+  t_mean          = 300.,       ! mean surface temp
   t_zero          = 315.,       ! temp at equator surface
   t_strat         = 200.,       ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
   delh            = 60.,        ! equator-pole temp contrast

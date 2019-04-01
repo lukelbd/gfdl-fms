@@ -4,10 +4,10 @@
 # Diagnostic table, describes data saved to netCDF
 # * First two lines *must* contain the experiment name, and the base time for
 #   the time axis. No comments above there.
-# * Warning: If you accidentally try to output two vars w/ same name, get
-#   silent failure.
 # * Note this is not a builtin fortran feature; GFDL model just reads and
 #   parses this file according to a certain syntax.
+# * The 'filename', 'outfreq', and 'frequnits' placeholders must be
+#   filled with double-quoted strings.
 
 ################################################################################
 # First declare filenames:
@@ -29,14 +29,8 @@ filename, outfreq, frequnits, 1, "days", "time",
 # 6. whether we take average
 # 7. other options
 # 8. save size [currently F32]
-# Note cannot save time-average data in same file as non-time-average data, it seems
-# Some decisions regarding output variables:
-#   * Store A and B hybrid coefficients as hyai and hybi to match the ECHAM conventions;
-#     they MUST BE STORED THIS WAY for CDO interpolation procedure to read them.
-#   * Don't save vor; can calculate on the fly using CDO spectral-coordinate
-#     algorithm, if necessary.
-#   * Don't bother with tau and Teq; can calculate them from model parameters
-#     (Although tau is function of model level can approximate from p data).
+# Note cannot save time-average data in same file as non-time-average data
+# If you accidentally try to output two vars w/ same name, get silent failure
 "dynamics", "temp",   "t",     filename, "all", .false., "none", 2,
 "dynamics", "ucomp",  "u",     filename, "all", .false., "none", 2,
 "dynamics", "vcomp",  "v",     filename, "all", .false., "none", 2,
@@ -47,26 +41,13 @@ filename, outfreq, frequnits, 1, "days", "time",
 "forcing",  "tdt",    "tdt",   filename, "all", .false., "none", 2,
 "forcing",  "udt",    "udt",   filename, "all", .false., "none", 2,
 "forcing",  "vdt",    "vdt",   filename, "all", .false., "none", 2,
-# "dynamics", "vor",    "vor",   filename, "all", .false., "none", 2,
-# "dynamics", "height", "z",     filename, "all", .false., "none", 2, # just approximate from hypsometric
+# Derivable params (you can calculate vor from u and v, z from hypsometric):
+# "dynamics", "vor",    "vor", filename, "all", .false., "none", 2,
+# "dynamics", "height", "z",   filename, "all", .false., "none", 2,
+# Mean and anomaly components:
 # "forcing",  "tdt_mean", "tdt1",  filename, "all", .false., "none", 2,
 # "forcing",  "tdt_anom", "tdt2",  filename, "all", .false., "none", 2,
 # "forcing",  "udt_mean", "udt1",  filename, "all", .false., "none", 2,
 # "forcing",  "udt_anom", "udt2",  filename, "all", .false., "none", 2,
 # "forcing",  "vdt_mean", "vdt1",  filename, "all", .false., "none", 2,
 # "forcing",  "vdt_anom", "vdt2",  filename, "all", .false., "none", 2,
-# Other options:
-# "hs_forcing",  "tdt_diss_rdamp",  "rdamp",         FILENAME,    "all",  .false., "none", 2,
-# "dynamics",    "pres_full",       "p",             FILENAME,    "all",  .false., "none", 2,
-# "hs_forcing",  "diss_heat_rdamp", "D",             FILENAME,    "all",  .false., "none", 2,
-# "dynamics",    "vor",             "vor",           FILENAME,    "all",  .false., "none", 2
-# "dynamics",    "bk",              "bhalf",         "6xdaily_inst", "all",  .false., "none", 2,
-# "ave",         -1,                "hours",         1,              "days", "time",
-# "8xdaily_ave", 3,                 "hours",         1,              "days", "time",
-# "dynamics",    "temp",            "t",             "8xdaily_ave",  "all",  .true.,  "none", 2,
-# "hs_forcing",  "teq",             "teq",           "ave",          "all",  .true.,  "none", 2,
-# "hs_forcing",  "temp",            "t",             "ave",          "all",  .true.,  "none", 2,
-# "dynamics",    "ps",              "p",             6xdaily_inst", "all",  .false., "none", 2,
-# "hs_forcing",  "tdt_ndamp",       "tdt_newtonian", 6xdaily_inst", "all",  .false., "none", 2,
-# "hs_forcing",  "tdt_diss_rdamp",  "tdt_rayleigh",  6xdaily_inst", "all",  .false., "none", 2,
-

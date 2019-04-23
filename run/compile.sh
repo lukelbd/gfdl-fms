@@ -27,10 +27,10 @@
 # Variables
 # Maybe need -lhdf5_hl, -lhdf5, -lmpichf90, -lmpl, -lm, -lz, but not sure
 execdir=./bin-${HOSTNAME%%.*}   # where code is compiled and executable is created
-flags_optimization='-O3'            # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
-flags_float='-Ktrap=fp'             # add =flag1,flag2,... for options; controls floating point exceptions; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
-flags_nc='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl' # include netcdf libs
-flags_mp='-Mmpi=mpich'              # special 'pgflags', adds flags -L$MPILIB -lfmpich -lmpich; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
+optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
+floatflags='-Ktrap=fp' # add =flag1,flag2,... for options; controls floating point exceptions; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
+ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl' # include netcdf libs
+mpflags='-Mmpi=mpich' # special 'pgflags', adds flags -L$MPILIB -lfmpich -lmpich; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
 cppdefs='-Duse_libMPI -Duse_netCDF' # not sure what this does
 
 # Use Intel MPI or openmpi instead of default mpt
@@ -54,8 +54,8 @@ case ${HOSTNAME%%.*} in
     fortran=mpiifort
     cpp=mpiicc
     # Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags
-    flags_float='' # the -Ktrap syntax is only for openmpi, not Intel mpi
-    flags_mp='-qopenmp' # misleading name for impi, but this is necessary; see https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
+    floatflags='' # the -Ktrap syntax is only for openmpi, not Intel mpi
+    mpflags='-qopenmp' # misleading name for impi, but this is necessary; see https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
     # Load modules? Or just run with correct modules installed already.
     # module load intel
   ;; monde)
@@ -98,7 +98,7 @@ mppnsource=$root/postprocessing/mppnccombine.c # source code
 # $pgi/pgcc -O -o $mppnccombine -I$netcdfc/include -I$mpich/include $mppnsource $lib_links $flags_libs
 time=$(date +%s)
 echo "Generating mppnccombine executable..."
-$cpp -O -o $execdir/mppnccombine.x $include_links $lib_links $flags_nc $mppnsource
+$cpp -O -o $execdir/mppnccombine.x $include_links $lib_links $ncflags $mppnsource
 cp $execdir/mppnccombine.x ./
 
 #------------------------------------------------------------------------------#
@@ -110,8 +110,8 @@ CC = $cpp
 FC = $fortran
 LD = $fortran
 CPPFLAGS =
-FFLAGS = -r8 -pc 64 $flags_float $flags_optimization
-LDFLAGS = $lib_links $flags_nc $flags_mp
+FFLAGS = -r8 -pc 64 $floatflags $optimization
+LDFLAGS = $lib_links $ncflags $mpflags
 LIST = -Mlist
 EOF
 cat $mkmftemplate >> mkmf.template # appends provided template to custom defs

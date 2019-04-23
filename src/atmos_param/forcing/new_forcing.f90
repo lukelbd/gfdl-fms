@@ -39,7 +39,7 @@ public :: forcing, forcing_init
 !-----------------------------------------------------------------------
 !     ----- Namelist -----
 real, parameter :: H = 7.0 ! for calculation below
-character(len=64) :: strat_mode = 'hs', strat_damp = 'constant'
+character(len=64) :: teq_mode = 'hs', damp_mode = 'hs', strat_damp = 'constant'
 logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
@@ -48,7 +48,6 @@ logical :: butler_arctic = .false., butler_tropical = .false., butler_ozone = .f
 logical :: ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
 integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
-real :: frac_schneider = 1.0/3.0
 real :: sigma_b  = 0.7
 real :: t_zero = 315.0, t_mean = 300.0, t_strat_usstd = 216.65, t_strat = 200.0
 real :: delh   = 60.0, delv          = 10.0,   eps     = 0.0
@@ -78,8 +77,8 @@ namelist /forcing_nml/  no_forcing, &
   x0_tropical, y0_tropical, sx_tropical, sy_tropical, &
   x0_ozone, y0_ozone, sx_ozone, sy_ozone, &
   x0_arctic, y0_arctic, &
-  strat_sponge, strat_vtx, strat_mode, strat_damp, &
-  surf_schneider, frac_schneider, &
+  strat_sponge, strat_vtx, strat_damp, teq_mode, damp_mode, &
+  surf_schneider, &
   t_zero, t_mean, t_strat, exp_h, delh, delv, eps, &
   lat_trop_ref, &
   vtx_edge, vtx_wid, vtx_gam, &
@@ -145,7 +144,7 @@ if (present(kbot)) then
     enddo
   enddo
 else
-  ps(:,:) = p_half(:,:,size(p_half,3))
+  ps = p_half(:,:,size(p_half,3))
 endif
 
 !-----------------------------------------------------------------------
@@ -513,14 +512,15 @@ real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
 !-----------------------------------------------------------------------
 integer, dimension(size(t,1),size(t,2)) :: trop_idx
 real, dimension(size(t,1),size(t,2)) :: &
-  w_vtx, cos_lat_2, t_surf_lat, &
+  w_vtx, lat_cos, lat_fact, &
   t_surf, t_std_tmp, t_pv_tmp, &
   s, z_full, z_trop, p_norm, p_trop, ps_inv
-real, dimension(size(t,2)) :: t_bar
-real, dimension(size(t,1),size(t,2),2) :: &
-  t_decomp, tkhi_decomp, tksurf_decomp ! containers for mean-anomaly decompositions
 real, dimension(size(t,1),size(t,2),size(t,3)) :: &
   t_pk, t_hs, t_pv, t_std ! intermediate containers
+real, dimension(size(t,1),size(t,2),2) :: &
+  t_decomp, tkhi_decomp, tksurf_decomp ! containers for mean-anomaly decompositions
+real, dimension(size(t,2)) :: &
+  t_bar ! just holds the mean
 real    :: p0, pb, plog, pexp
 real    :: z_trop_ref, p_pkswitch, p_trop_ref, lat_trop_ref_r, vtx_edge_r, vtx_wid_r
 integer :: i, j, k, l, m, seconds, days
@@ -537,16 +537,16 @@ pexp           = rdgas*vtx_gam*1.0e-3/grav
 
 !-----------------------------------------------------------------------
 !     Surface temp and damping
-! Default configuration (when exp_h .eq. 0) and poleward shift
+! Poleward shift or default configuration
 if (exp_h .ge. 0) then
-  t_surf_lat(:,:) = sin(lat(:,:))**(2 + exp_h)
+  lat_fact = sin(lat)**(2 + exp_h)
 ! Equatorward shift
 else
-  t_surf_lat(:,:) = 1 - cos(lat(:,:))**(2 - exp_h)
+  lat_fact = 1 - cos(lat)**(2 - exp_h)
 endif
 ! Surface damping
 do l=1,2
-  tksurf_decomp(:,:,l) = (tkbl(l)-tktrop(l))*cos(lat(:,:))**exp_b
+  tksurf_decomp(:,:,l) = (tkbl(l)-tktrop(l))*cos(lat)**exp_b
 enddo
 
 !-----------------------------------------------------------------------
@@ -555,29 +555,28 @@ enddo
 ! average due to the sine term cancels with the offset term. Easy to do for
 ! exp_h > 1, hard for cosine version. We don't try to make a general form.
 if (surf_schneider) then
-  t_surf(:,:) = t_mean + delh*(frac_schneider - t_surf_lat(:,:)) - eps*sin(lat(:,:))
+  t_surf = t_mean + delh*(1.0/3.0 - lat_fact) - eps*sin(lat)
 else
-  t_surf(:,:) = t_zero - delh*t_surf_lat(:,:) - eps*sin(lat(:,:))
+  t_surf = t_zero - delh*lat_fact - eps*sin(lat)
 endif
 
 !-----------------------------------------------------------------------
 !     Vortex weighting
-w_vtx(:,:) = 0.0 ! standard atmosphere everywhere
+w_vtx = 0.0 ! standard atmosphere everywhere
 if (strat_vtx) then
-  w_vtx(:,:) = 0.5*(1.0 + tanh((lat(:,:) - abs(vtx_edge_r))/vtx_wid_r)) ! vortex in northern hemisphere
+  w_vtx = 0.5*(1.0 + tanh((lat - abs(vtx_edge_r))/vtx_wid_r)) ! vortex in northern hemisphere
 endif
 
 !-----------------------------------------------------------------------
 !     Tropopause height estimate
 ! Dimensions are longitude by <processor latitudes> by height
 ! Run model with one core for print statements
-cos_lat_2(:,:) = cos(lat(:,:))**2 ! for use later on
-
-p_trop(:,:) = p0*( t_strat / (t_surf(:,:) - delv*log(plog/p0)*cos_lat_2(:,:)) )**(1.0/kappa)
+lat_cos = cos(lat)**2 ! for use later on
+p_trop = p0*( t_strat / (t_surf - delv*log(plog/p0)*lat_cos) )**(1.0/kappa)
 p_trop_ref  = p0*( t_strat / (t_zero - delh*sin(lat_trop_ref_r)**2 - eps*sin(lat_trop_ref_r) &
                              - delv*log(plog/p0)*cos(lat_trop_ref_r)**2) )**(1.0/kappa)
 
-z_trop(:,:) = -H*log(p_trop(:,:)/p0)
+z_trop = -H*log(p_trop/p0)
 z_trop_ref  = -H*log(p_trop_ref/p0)
 p_pkswitch  = p0*exp(-z_pkswitch/H)
 
@@ -600,45 +599,45 @@ do k=1,size(t,3)
   !     Equilibrium temp calculations
   !
   !-----------------------------------------------------------------------
-  z_full(:,:) = -H*log(p_full(:,:,k)/p0)
-  p_norm(:,:) = p_full(:,:,k)/p0
-  s(:,:)      = p_full(:,:,k)*ps_inv(:,:)
-  t_hs(:,:,k) = (t_surf(:,:) - delv*log(p_norm(:,:))*cos_lat_2(:,:)) * (p_norm(:,:))**kappa
-  if (trim(strat_mode) == 'hs') then
+  z_full = -H*log(p_full(:,:,k)/p0)
+  p_norm = p_full(:,:,k)/p0
+  s      = p_full(:,:,k)*ps_inv
+  t_hs(:,:,k) = (t_surf - delv*log(p_norm)*lat_cos) * (p_norm)**kappa
+  if (trim(teq_mode) == 'hs') then
 
     !     ----- Held Suarez -----
     teq(:,:,k) = max( t_hs(:,:,k), t_strat )
 
-  else if (trim(strat_mode) == 'pk') then
+  else if (trim(teq_mode) == 'pk') then
 
     !     ----- Polvani Kushner -----
     ! Requires stratosphere temperature exactly matches US standard temp tropopause
     call us_tstd_2d( p_full(:,:,k), t_std_tmp )
-    t_std(:,:,k) = t_std_tmp(:,:)
+    t_std(:,:,k) = t_std_tmp
     t_pv(:,:,k)  = t_strat_usstd*(p_full(:,:,k)/p_pkswitch)**pexp
-    t_pk(:,:,k)  = (1.0 - w_vtx(:,:))*t_std(:,:,k) + (w_vtx(:,:))*t_pv(:,:,k)
-    where (z_full(:,:) >= z_pkswitch)
+    t_pk(:,:,k)  = (1.0 - w_vtx)*t_std(:,:,k) + (w_vtx)*t_pv(:,:,k)
+    where (z_full >= z_pkswitch)
       teq(:,:,k) = t_pk(:,:,k)
     elsewhere
       teq(:,:,k) = max( t_hs(:,:,k), t_strat_usstd )
     endwhere
 
-  else if (trim(strat_mode) == 'dbt') then
+  else if (trim(teq_mode) == 'dbt') then
 
     !     ----- Davis et al. -----
     ! Similar, but strat profile conforms to tropopause
-    call us_tstd_modified( t_strat, vtx_gam, z_trop_ref, z_trop(:,:), z_full(:,:), t_std_tmp(:,:), t_pv_tmp(:,:) )
-    t_std(:,:,k) = t_std_tmp(:,:)
-    t_pv(:,:,k)  = t_pv_tmp(:,:)
-    t_pk(:,:,k)  = (1.0 - w_vtx(:,:))*t_std(:,:,k) + (w_vtx(:,:))*t_pv(:,:,k)
-    where (z_full(:,:) >= z_trop(:,:))
+    call us_tstd_modified( t_strat, vtx_gam, z_trop_ref, z_trop, z_full, t_std_tmp, t_pv_tmp )
+    t_std(:,:,k) = t_std_tmp
+    t_pv(:,:,k)  = t_pv_tmp
+    t_pk(:,:,k)  = (1.0 - w_vtx)*t_std(:,:,k) + (w_vtx)*t_pv(:,:,k)
+    where (z_full >= z_trop)
       teq(:,:,k) = t_pk(:,:,k)
     elsewhere
       teq(:,:,k) = max( t_hs(:,:,k), t_strat )
     endwhere
 
   else
-    call error_mesg ('forcing','Unrecognized stratosphere option "' // strat_mode // '"', FATAL)
+    call error_mesg ('forcing','Unrecognized equilibrium temp mode "' // teq_mode // '"', FATAL)
   endif
 
   !-----------------------------------------------------------------------
@@ -648,22 +647,22 @@ do k=1,size(t,3)
   !
   !-----------------------------------------------------------------------
   do l=1,2
-    if (trim(strat_mode) == 'hs') then
+    if (trim(damp_mode) == 'hs') then
 
       !     ----- Held Suarez -----
       ! Damping rate
-      where (s(:,:) > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s(:,:)-sigma_b)/(1.0-sigma_b)
+      where (s > sigma_b)
+        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s-sigma_b)/(1.0-sigma_b)
       elsewhere
         tdamp(:,:,k,l) = tktrop(l)
       endwhere
 
-    else if (trim(strat_mode) == 'pk') then
+    else if (trim(damp_mode) == 'pk') then
 
       !     ----- Polvani Kushner -----
       ! Damping rate
       ! Alternatively use smooth version below: see Holton-Mass model, 1976 (Journal of Atmospheric Sciences)
-      ! tkhi(:,:) = tkstrat + (1.0 + tanh((z_full(:,:)-35.0)/7.0))*(tkmeso-tkstrat)/2.0
+      ! tkhi = tkstrat + (1.0 + tanh((z_full-35.0)/7.0))*(tkmeso-tkstrat)/2.0
       ! Say the polar tropopause height is 5km below equatorial one
       ! Then using e^(-z/H) the pressure depth of transition region is half as big at equator, which makes sense
       ! If loops not allowed inside where loop, so do it here
@@ -671,21 +670,21 @@ do k=1,size(t,3)
         tkhi_decomp(:,:,l) = tkstrat(l)
       else if (trim(strat_damp) == 'linear') then ! *linear* above tropopause region, relaxing from kstrat to faster kmeso
         tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full(:,:)-z_pkswitch-z_kdepth)/(50-z_pkswitch-z_kdepth))
+          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full-z_pkswitch-z_kdepth)/(50-z_pkswitch-z_kdepth))
       else
         call error_mesg ('forcing','Unrecognized damping option "' // strat_damp // '"', FATAL)
       endif
-      where (s(:,:) > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s(:,:)-sigma_b)/(1.0-sigma_b)
-      elsewhere (z_full(:,:) < z_pkswitch)
+      where (s > sigma_b)
+        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s-sigma_b)/(1.0-sigma_b)
+      elsewhere (z_full < z_pkswitch)
         tdamp(:,:,k,l) = tktrop(l)
-      elsewhere (z_full(:,:) >= z_pkswitch .and. z_full(:,:) < z_pkswitch + z_kdepth)
-        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l)-tkstrat(l))*(z_full(:,:)-z_pkswitch)/z_kdepth
+      elsewhere (z_full >= z_pkswitch .and. z_full < z_pkswitch + z_kdepth)
+        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l)-tkstrat(l))*(z_full-z_pkswitch)/z_kdepth
       elsewhere
         tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
       endwhere
 
-    else if (trim(strat_mode) == 'dbt') then
+    else if (trim(damp_mode) == 'dbt') then
 
       !     ----- Davis et al. -----
       ! Again, conforms to tropopause
@@ -694,19 +693,22 @@ do k=1,size(t,3)
         tkhi_decomp(:,:,l) = tkstrat(l)
       else if (trim(strat_damp) == 'linear') then ! *linear* above tropopause region, relaxing from kstrat to faster kmeso
         tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full(:,:)-z_trop(:,:)-z_kdepth)/(50-z_trop(:,:)-z_kdepth))
+          tkstrat(l) + (tkmeso(l)-tkstrat(l))*(z_full-z_trop-z_kdepth)/(50-z_trop-z_kdepth))
       else
         call error_mesg ('forcing','Unrecognized damping option "' // strat_damp // '"', FATAL)
       endif
-      where (s(:,:) > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s(:,:)-sigma_b)/(1.0-sigma_b)
-      elsewhere (z_full(:,:) < z_trop(:,:)) ! below tropopause, not some fixed height
+      where (s > sigma_b)
+        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s-sigma_b)/(1.0-sigma_b)
+      elsewhere (z_full < z_trop) ! below tropopause, not some fixed height
         tdamp(:,:,k,l) = tktrop(l)
-      elsewhere (z_full(:,:) >= z_trop(:,:) .and. z_full(:,:) < z_trop(:,:)+z_kdepth)
-        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l)-tkstrat(l))*(z_full(:,:)-z_trop(:,:))/z_kdepth
+      elsewhere (z_full >= z_trop .and. z_full < z_trop+z_kdepth)
+        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l)-tkstrat(l))*(z_full-z_trop)/z_kdepth
       elsewhere
         tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
       endwhere
+
+    else
+      call error_mesg ('forcing','Unrecognized thermal damping mode "' // damp_mode // '"', FATAL)
     endif
 
     !-----------------------------------------------------------------------
@@ -725,9 +727,9 @@ do k=1,size(t,3)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
       ! Damp the mean (first dimension is longitudes)
-      t_bar(:) = sum(t(:,:,k), 1)/size(t, 1) ! mean
+      t_bar = sum(t(:,:,k), 1)/size(t, 1) ! mean
       do i=1,size(t,1)
-        t_decomp(i,:,1) = t_bar(:)
+        t_decomp(i,:,1) = t_bar
       enddo
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t_decomp(:,:,1) - teq(:,:,k))
     else if (l==2) then
@@ -763,7 +765,7 @@ enddo
 
 !     ----- Mask -----
 if (present(mask)) then
-  teq(:,:,:) = teq(:,:,:) * mask
+  teq = teq * mask
   do l=1,2
     tdt(:,:,:,l) = tdt(:,:,:,l) * mask
   enddo
@@ -791,13 +793,13 @@ real, dimension(size(t,1),size(t,2),size(t,3)) :: x, y, mask_arctic
 ! TODO: Consider also vectorizing newtonian damping code in pressure?
 ps_inv = 1./ps
 do k = 1, size(t,3)
-  x(:,:,k) = lat(:,:)*pi/180.0
-  y(:,:,k) = p_full(:,:,k)*ps_inv(:,:)
+  x(:,:,k) = lat*pi/180.0
+  y(:,:,k) = p_full(:,:,k)*ps_inv
   mask_arctic(:,:,k) = real((x(:,:,k) .gt. 0))
 enddo
 
 !     ----- Tropical forcing, mimics lapse rate feedback -----
-tdt(:,:,:) = 0.0
+tdt = 0.0
 if (butler_tropical) then
   tdt = tdt + q0_tropical*seconds_per_day*exp( &
     -((x - x0_tropical)**2/(2*sx_tropical**2) + &
@@ -846,13 +848,13 @@ integer :: i, j, k, l
 
 ps_inv  = 1./ps
 do k=1,size(u,3)
-  s(:,:) = p_full(:,:,k)*ps_inv(:,:)
+  s = p_full(:,:,k)*ps_inv
   do l=1,2
     !    ---- Determine damping coeffs ----
-    where (s(:,:) <= 1.0 .and. s(:,:) > sigma_b)
-      uvdamp(:,:,k,l) = vkfric(l)*(s(:,:)-sigma_b)/(1.0-sigma_b)
+    where (s <= 1.0 .and. s > sigma_b)
+      uvdamp(:,:,k,l) = vkfric(l)*(s-sigma_b)/(1.0-sigma_b)
     elsewhere
-      uvdamp(:,:,k,l) = 0.0*s(:,:)
+      uvdamp(:,:,k,l) = 0.0*s
     endwhere
 
     !    ---- Apply damping ----
@@ -867,11 +869,11 @@ do k=1,size(u,3)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
       ! Damp the means
-      u_mean(:) = sum(u(:,:,k),1)/size(u,1) ! mean
-      v_mean(:) = sum(v(:,:,k),1)/size(v,1)
+      u_mean = sum(u(:,:,k),1)/size(u,1) ! mean
+      v_mean = sum(v(:,:,k),1)/size(v,1)
       do i=1,size(u,1)
-        u_decomp(i,:,1) = u_mean(:)
-        v_decomp(i,:,1) = v_mean(:)
+        u_decomp(i,:,1) = u_mean
+        v_decomp(i,:,1) = v_mean
       enddo
       udt(:,:,k,1)    = -uvdamp(:,:,k,1)*u_decomp(:,:,1)
       vdt(:,:,k,1)    = -uvdamp(:,:,k,1)*v_decomp(:,:,1)
@@ -916,14 +918,14 @@ p_sp   = p_sponge * 100.
 ksp    = -vksponge(1) ! for time being, no option to separate mean/anomaly sponge damping
 
 do k = 1, size(u,3)
-  s(:,:) = p_full(:,:,k)*ps_inv(:,:)
-  ! where (s(:,:) < p_sponge)
+  s = p_full(:,:,k)*ps_inv
+  ! where (s < p_sponge)
   where (p_full(:,:,k) .lt. p_sp)
-    ! sp_fact(:,:) = (p_sponge-s(:,:))/p_sponge
-    sp_fact(:,:) = (p_sp-p_full(:,:,k))/p_sp
-    spcoeff(:,:) = ksp*sp_fact(:,:)*sp_fact(:,:)
-    uspg(:,:,k)  = spcoeff(:,:)*u(:,:,k) 
-    vspg(:,:,k)  = spcoeff(:,:)*v(:,:,k)
+    ! sp_fact = (p_sponge-s)/p_sponge
+    sp_fact = (p_sp-p_full(:,:,k))/p_sp
+    spcoeff = ksp*sp_fact*sp_fact
+    uspg(:,:,k)  = spcoeff*u(:,:,k) 
+    vspg(:,:,k)  = spcoeff*v(:,:,k)
   elsewhere
     uspg(:,:,k)  = 0.
     vspg(:,:,k)  = 0.
@@ -959,7 +961,7 @@ rdamp = damp
 if (rdamp < 0.) rdamp = -seconds_per_day*rdamp   ! convert days to seconds
 if (rdamp > 0.) rdamp = 1./rdamp
 
-source(:,:,:)=0.0
+source=0.0
 if (present(kbot)) then
   do j=1,size(r,2)
     do i=1,size(r,1)
@@ -970,12 +972,12 @@ if (present(kbot)) then
   enddo
 else
   kb = size(r,3)
-  pmass (:,:)    = p_half(:,:,kb+1) - p_half(:,:,kb)
-  source(:,:,kb) = flux/pmass(:,:)
+  pmass     = p_half(:,:,kb+1) - p_half(:,:,kb)
+  source(:,:,kb) = flux/pmass
 endif
 
-sink(:,:,:) = rdamp*r(:,:,:)
-rdt(:,:,:) = source(:,:,:)-sink(:,:,:)
+sink = rdamp*r
+rdt = source-sink
 
 end subroutine tracer_source_sink
 

@@ -44,7 +44,7 @@ logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
 logical :: surf_schneider = .false. ! HS94 or Schneider surface temp?
-logical :: butler_arctic = .false., butler_tropical = .false., butler_ozone = .false.
+logical :: butler_arctic = .false., butler_tropical = .false., butler_vortex = .false.
 logical :: ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
 integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
@@ -56,7 +56,7 @@ real :: p_ref    = 1000.0, p_sponge = 0.5,  p_logeval = 200.0
 real :: z_pkswitch = 16.0, z_kdepth = 50.0 ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
 real :: lat_trop_ref = 0
 real :: q0_tropical = 0.5, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11 ! upper troposphere is default
-real :: q0_ozone = 0.5, x0_ozone = 1.57, y0_ozone = 0.1, sx_ozone = 0.4, sy_ozone = 0.14               ! lower stratosphere is default
+real :: q0_vortex = 0.5, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14               ! lower stratosphere is default
 real :: q0_arctic = 0.5, x0_arctic = 1.57, y0_arctic = 1.0
 real :: trflux = 1.e-5 ! surface flux for optional tracer
 real :: trsink = -4.   ! damping time for tracer
@@ -73,9 +73,9 @@ real, dimension(2) :: ksponge = fill_value
 
 !-----------------------------------------------------------------------
 namelist /forcing_nml/  no_forcing, &
-  butler_arctic, butler_tropical, butler_ozone, &
+  butler_arctic, butler_tropical, butler_vortex, &
   x0_tropical, y0_tropical, sx_tropical, sy_tropical, &
-  x0_ozone, y0_ozone, sx_ozone, sy_ozone, &
+  x0_vortex, y0_vortex, sx_vortex, sy_vortex, &
   x0_arctic, y0_arctic, &
   strat_sponge, strat_vtx, strat_damp, teq_mode, damp_mode, &
   surf_schneider, &
@@ -170,7 +170,7 @@ endif
 call newtonian_damping ( lat, ps, p_full, t, ttnd, tdamp, teq, mask )
 
 ttnd_butler = 0.0
-if (butler_arctic .or. butler_tropical .or. butler_ozone) then
+if (butler_arctic .or. butler_tropical .or. butler_vortex) then
   call butler_forcing ( lat, ps, p_full, t, ttnd_butler, mask )
 endif
 
@@ -791,32 +791,37 @@ real, dimension(size(t,1),size(t,2),size(t,3)) :: x, y, mask_arctic
 
 ! Sigma levels
 ! TODO: Consider also vectorizing newtonian damping code in pressure?
+tdt = 0.0
 ps_inv = 1./ps
 do k = 1, size(t,3)
-  x(:,:,k) = lat*pi/180.0
+  x(:,:,k) = lat ! already in radians
   y(:,:,k) = p_full(:,:,k)*ps_inv
-  mask_arctic(:,:,k) = real((x(:,:,k) .gt. 0))
 enddo
 
 !     ----- Tropical forcing, mimics lapse rate feedback -----
-tdt = 0.0
 if (butler_tropical) then
-  tdt = tdt + q0_tropical*seconds_per_day*exp( &
+  tdt = tdt + q0_tropical*exp( &
     -((x - x0_tropical)**2/(2*sx_tropical**2) + &
-      (y - y0_tropical)**2/(2*sy_tropical**2)))
+      (y - y0_tropical)**2/(2*sy_tropical**2)) &
+      ) / seconds_per_day
 endif
 
 !     ----- Arctic forcing, mimics Arctic amplification -----
 if (butler_arctic) then
-  tdt = tdt + mask_arctic*q0_arctic*seconds_per_day &
-    * cos(x-x0_arctic)**15 * exp(6*(y - y0_arctic))
+  do k = 1, size(t,3)
+    mask_arctic(:,:,k) = real((x(:,:,k) .gt. 0))
+  enddo
+  tdt = tdt + mask_arctic*q0_arctic &
+    * cos(x - x0_arctic)**15 * exp(6*(y - y0_arctic)) &
+    / seconds_per_day
 endif
 
-!     ----- Ozone forcing, mimics ozone depletion -----
-if (butler_ozone) then
-  tdt = tdt + q0_ozone*seconds_per_day*exp( &
-    -2*((x - x0_ozone)**2/(2*sx_ozone**2) + &
-        (y - y0_ozone)**2/(2*sy_ozone**2)))
+!     ----- Polar vortex forcing, mimics ozone depletion -----
+if (butler_vortex) then
+  tdt = tdt + q0_vortex*exp( &
+    -2*((x - x0_vortex)**2/(2*sx_vortex**2) + &
+        (y - y0_vortex)**2/(2*sy_vortex**2)) &
+        ) / seconds_per_day
 endif
 
 !     ----- Mask -----

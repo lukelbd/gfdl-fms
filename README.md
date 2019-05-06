@@ -1,8 +1,7 @@
 # GFDL dry core modifications
+This repository documents changes to the GFDL dry dynamical core model. The original model can be found [here](https://github.com/lukelbd/gfdl-drycore-release). For model documentation, see the [path_names.html](https://github.com/lukelbd/gfdl-drycore/master/blob/src/path_names.html) file.
 
-See the file [doc.pdf](https://github.com/lukelbd/gfdl-drycore/master/blob/doc.pdf) for more information.
-
-Namelist parameters for the modified forcing scheme are specified in the `&forcing_nml` namelist; a sample can be found in the file [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml).
+New forcing scheme parameters can be specified by the `&forcing_nml` namelist. A sample can be found in the [`forcing_default.nml`](https://github.com/lukelbd/gfdl-drycore/blob/master/forcing_default.nml) file.
 
 # Model Documentation
 ## Model levels
@@ -23,14 +22,19 @@ Note the ERA-Interim archive was produced with the Cy31r1 model release, i.e. 91
 | 266 | 400 | 100 (4) |
 
 ## Diagnostic table `diag_table`
-Note that **comments** in `diag_table` (lines starting with `#`) can only come after the header lines, and cannot interrupt contiguous "file lines" and "field lines". Also note that **strings** must be in double quotes.
+The "diagnostic table" is used to configure the NetCDF data file(s) output by the model. It consists of two header lines, any number of file definition lines, and any number of variable definition lines.
+A description of the diagnostic table syntax is below.
+Note that all strings should be in double quotes.
+Also note that comments in `diag_table` consist of lines starting with `#`, can only come after the header lines, and cannot interrupt contiguous file definition and variable definition lines.
 
 ### Header lines
+This section consists of two lines.
 
-1. Experiment title
-1. Base date for netCDF output; default is `0000-00-00 00:00:00`)
+1. Experiment title string
+1. Base date for the NetCDF `time` variable(s), specified as the integer year, month, day, hour, minute, and second. The default is `0 0 0 0 0 0`.
 
-### Ouput file line (6 comma-separated values)
+### Output file line(s)
+This section consists of any number of lines with 6 comma-separated values.
 
 1. File name string
 1. Output frequency, one of the following:
@@ -42,7 +46,8 @@ Note that **comments** in `diag_table` (lines starting with `#`) can only come a
 1. Time axis units: units for time axis on output NetCDF, one of the following: `"days"`, `"minutes"`, `"hours"`, `"seconds"`
 1. Time axis name: name for time axis on output NetCDF, default `"time"`
 
-### Diagnostic field line (8 comma-separated values)
+### Diagnostic field line
+This section consists of any number of lines with 8 comma-separated values.
 
 1. Module name that can export this parameter name (e.g. `"dynamics"` or `"forcing"`)
 1. Fortran module parameter name 

@@ -9,13 +9,14 @@ The following features were added to the model.
 * New forcing options are added to the [forcing.f90](src/atmos_param/forcing/forcing.f90) file. These include an optional Polvani and Kushner (2002) `'pk'` scheme and an optional *modified* Polvani and Kushner `'pkmod'` scheme, with stratospheric equilibrium temperatures conforming to the height at which the stratospheric equilibrium temperature is reached. They also include the option to load constant diabatic heating from a file instead of using Newtonian damping, and optional static heating terms. See [input.nml](run/input.nml) for details.
 
 ## Documentation
+The full, original model documentation is published on [github-pages](https://lukelbd.github.io/gfdl-drycore). Further documentation is described below.
+
 * [input.nml](run/input.nml) is the default namelist file. It allows you to specify various model settings and forcing parameters at run-time, rather than compile-time. Descriptions of each parameter are indicated in comments.
 * [diag_table](run/diag_table) is the "diagnostic table" that specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in comments.
-* [path_names.html](src/path_names.html) provides the full, original model documentation.
-* [barotropic.pdf](barotropic.pdf), [shallow.pdf](shallow.pdf), and [spectral.pdf](spectral.pdf) contain background information on the model physical equations.
+* [barotropic.pdf](doc/barotropic.pdf), [shallow.pdf](doc/shallow.pdf), and [spectral.pdf](doc/spectral.pdf) contain background information on the model physical equations.
 
-## Resolution
-The following is a table of valid truncation numbers with the corresponding recommended number of latitudes and cores for parallelization.
+## Truncation
+The following is a table of valid truncation numbers with the corresponding recommended number of latitudes and cores for parallelization. Remember that $N \geq (3M + 1)/2$, where $N$ is the number of latitudes and $M$ is the truncation number.
 
 | Truncation | Number of latitudes | Recommended cores (latitudes per file) |
 | ---        | ---    |  ---       |

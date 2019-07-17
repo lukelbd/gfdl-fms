@@ -1,0 +1,18 @@
+#!/usr/bin/bash
+# This file renames modules found throughout the project
+# cat "$f" | grep "$pattern"
+dryrun=false
+pattern="$1"
+replace="$2"
+path=${0%/*}
+[ $# -ne 2 ] && echo "Error: Must supply rename with a pattern and replacement." && exit 1
+for f in $(grep -l -r "$pattern" "$path/../src"); do
+  echo
+  echo "$f"
+  if $dryrun; then
+    cat "$f" | grep "$pattern"
+    cat "$f" | grep "$pattern" | sed "s/$pattern/$replace/g"
+  else
+    sed -i "s/$pattern/$replace/g" "$f"
+  fi
+done

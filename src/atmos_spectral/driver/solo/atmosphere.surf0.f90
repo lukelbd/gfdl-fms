@@ -21,7 +21,7 @@ use    spectral_dynamics_mod, only: spectral_dynamics_init, spectral_dynamics, s
 
 use          tracer_type_mod, only: tracer_type
 
-use           hs_forcing_mod, only: hs_forcing_init, hs_forcing
+use           forcing_mod, only: forcing_init, forcing
 
 use        field_manager_mod, only: MODEL_ATMOS
 
@@ -178,7 +178,7 @@ do i=is, ie
   rad_lon_2d(i,:) = deg_lon(i)*pi/180.
 enddo
 
-call hs_forcing_init(get_axis_id(), Time)
+call forcing_init(get_axis_id(), Time)
 
 module_is_initialized = .true.
 
@@ -211,7 +211,7 @@ endif
 
 Time_next = Time + Time_step
 
-call hs_forcing(1, ie-is+1, 1, je-js+1, delta_t, Time_next, rad_lat_2d(:,:), rad_lon_2d(:,:), &
+call forcing(1, ie-is+1, 1, je-js+1, delta_t, Time_next, rad_lat_2d(:,:), rad_lon_2d(:,:), &
                 p_half(:,:,:         ),       p_full(:,:,:           ), &
                 z_full(:,:,:         ),                                 &
                     ug(:,:,:,previous),           vg(:,:,:,previous  ), &

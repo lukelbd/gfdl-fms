@@ -40,7 +40,7 @@ use fms_mod,          only: file_exist, open_namelist_file,   &
                             write_version_number,             &
                             close_file, set_domain
 
-  use hs_forcing_mod,   only: hs_forcing_init
+  use forcing_mod,   only: forcing_init
  use constants_mod, only: omega, cp_air, rdgas, kappa, radius, grav, rvgas
 
 !------------------
@@ -138,7 +138,7 @@ contains
 
     call fv_diag_init( axes, Time )
 
-    if( nlev > 1 ) call hs_forcing_init ( axes, Time )
+    if( nlev > 1 ) call forcing_init ( axes, Time )
 
 !-----------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 <HTML>
-<TITLE>module hs_forcing</TITLE>
+<TITLE>module forcing</TITLE>
 <BODY BGCOLOR="#ffefd5" TEXT="#332211" >
 
 <DIV ALIGN="CENTER"> <FONT SIZE=-2>
@@ -14,13 +14,13 @@
 <BR><BR></DIV><HR>
 
 
-<H2>Module hs_forcing_mod</H2>
+<H2>Module forcing_mod</H2>
 <A NAME="HEADER">
 <PRE>
      <B>Contact:</B>   Isaac Held, Bruce Wyman
      <B>Reviewers:</B>
      <B>Change history:</B> <A HREF="http://www.gfdl.noaa.gov/fms-cgi-bin/cvsweb.cgi/FMS
-/atmos/param/hs_forcing/hs_forcing.f90">WebCVS Log for hs_forcing.f90</A>
+/atmos/param/forcing/forcing.f90">WebCVS Log for forcing.f90</A>
 
 </PRE>
 </A><!-- END HEADER -->
@@ -66,11 +66,11 @@ tracer_manager_mod
 <!-- BEGIN PUBLIC INTERFACE -->
 <PRE>
 
-  use hs_forcing_mod [,only: hs_forcing_init,   &
-                             hs_forcing         ]
+  use forcing_mod [,only: forcing_init,   &
+                             forcing         ]
 
-hs_forcing_init           : initializes module
-hs_forcing                : adds tendencies to existing tendencies
+forcing_init           : initializes module
+forcing                : adds tendencies to existing tendencies
 
 <b>Notes:</b>
 
@@ -88,7 +88,7 @@ hs_forcing                : adds tendencies to existing tendencies
 <!-- BEGIN PUBLIC ROUTINES -->
 <PRE>
 
-<b>call hs_forcing_init</b> ( axes, Time )
+<b>call forcing_init</b> ( axes, Time )
 
  INPUT:
 
@@ -101,7 +101,7 @@ hs_forcing                : adds tendencies to existing tendencies
 
 <HR>
 
-<b>call hs_forcing</b> ( is, ie, js, je, dt, Time, lat, phalf, pfull,
+<b>call forcing</b> ( is, ie, js, je, dt, Time, lat, phalf, pfull,
                   u, v, t, r, um, vm, tm, rm, udt, vdt, tdt, rdt
                   <FONT COLOR="#007700">[, mask, kbot]</FONT> )
     
@@ -203,13 +203,13 @@ logical :: do_conserve_energy =.true.  if true, kinetic energy dissipated by fri
 <H4>DIAGNOSTIC FIELDS</H4>
 <PRE>
 Diagnostic fields may be output to a netcdf file by specifying the 
-module name identifier <b>hs_forcing</b> and the desired field names (given below)
+module name identifier <b>forcing</b> and the desired field names (given below)
 in file <b>diag_table</b>. See the documentation for diag_manager.
 </PRE>
 <!-- BEGIN DIAGNOSTIC FIELDS -->
 <PRE>
 
-Diagnostic fields for module name identifier: <b>hs_forcing</b>
+Diagnostic fields for module name identifier: <b>forcing</b>
 
    field name       field description
    ----------       -----------------
@@ -236,10 +236,10 @@ Diagnostic fields for module name identifier: <b>hs_forcing</b>
 <!-- BEGIN ERROR MESSAGES -->
 <PRE>
 
-<b>FATAL errors in hs_forcing_mod</b>
+<b>FATAL errors in forcing_mod</b>
 
-    <b>have not called hs_forcing_init</b>
-        You have not called hs_forcing_init before hs_forcing.
+    <b>have not called forcing_init</b>
+        You have not called forcing_init before forcing.
 
 </PRE>
 </A><!-- END ERROR MESSAGES -->

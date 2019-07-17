@@ -7,7 +7,7 @@ contains
   subroutine fv_phys( Time , ndt )
 
     use time_manager_mod, only: time_type
-    use hs_forcing_mod,   only: hs_forcing
+    use forcing_mod,   only: forcing
     use constants_mod,    only: grav, kappa, rdgas
     use fv_pack, only: nt_phys, beglat, endlat, nlon, nlev, rlat
     use shr_kind_mod,     only : r8 => shr_kind_r8
@@ -97,7 +97,7 @@ contains
           enddo
        enddo
 
-       call hs_forcing(is,   ie,  j,  j,  dt,  Time,               &
+       call forcing(is,   ie,  j,  j,  dt,  Time,               &
             rlat(is:ie,j:j),      p_half(is:ie,beglat:beglat,:),   &
             p_full(is:ie,beglat:beglat,:),                         &
             ua(is:ie,j:j,1:nlev), va(is:ie,j:j,1:nlev),            &

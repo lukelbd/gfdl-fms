@@ -59,14 +59,12 @@ case ${HOSTNAME%%.*} in
 esac
 
 # Directories
-src=$root/src                                  # path to directory containing model source code
-pathnames=$src/path_names                      # change this to pick different blocks of code
+pathnames=$root/path_names                      # change this to pick different blocks of code
 mkmf=$root/bin/mkmf                            # path to executable mkmf
 mkmftemplate=$root/bin/mkmf.template           # template of most basic settings
 mppnsource=$root/postprocessing/mppnccombine.c # source code
 # Make sure necessary things tools are in path
 ! [ -d bin ]           && mkdir bin || echo "Warning: Leaving old compiled source."
-! [ -d $src ]          && raise "Could not find source code directory $src."
 ! [ -r $pathnames ]    && raise "Could not find path_names file $pathnames."
 ! [ -r $mppnsource ]   && raise "Could not find mppnccombine source code."
 ! [ -r $mkmftemplate ] && raise "Could not find Makefile template."
@@ -95,10 +93,10 @@ DELIM
 cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
 
 # Create makefile
+# cat mkmf.template
 echo "Generating Makefile..."
-cat mkmf.template
-$mkmf -p fms.x -t mkmf.template -c "$cppdefs" -a $src $pathnames \
-  $src/shared/mpp/include $src/shared/include ${include[@]} # the other include files
+$mkmf -p fms.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
+  $root/src/shared/mpp/include $root/src/shared/include ${include[@]} # the other include files
 [ $? -ne 0 ] && raise "Mppnccombine compilation failed."
 
 # Compile source

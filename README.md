@@ -17,7 +17,7 @@ The following features were added to the model.
 ## Resolution
 The following is a table of valid truncation numbers with the corresponding recommended number of latitudes and cores for parallelization.
 
-| Truncation | Number of latitudes | Recommended number of cores (latitudes per file) |
+| Truncation | Number of latitudes | Recommended cores (latitudes per file) |
 | ---        | ---    |  ---       |
 | 42 | 64 | 16 (4) |
 | 63 | 96 | 24 (4) |

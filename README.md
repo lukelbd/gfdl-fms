@@ -16,7 +16,7 @@ The full, original model documentation is published on [github-pages](https://lu
 * [barotropic.pdf](doc/barotropic.pdf), [shallow.pdf](doc/shallow.pdf), and [spectral.pdf](doc/spectral.pdf) contain background information on the model physical equations.
 
 ## Truncation
-The following is a table of valid truncation numbers with the corresponding recommended number of latitudes and cores for parallelization. Remember that $N \geq (3M + 1)/2$, where $N$ is the number of latitudes and $M$ is the truncation number.
+The following is a table of valid truncation numbers with the corresponding recommended number of latitudes and cores for parallelization. Remember that to avoid aliasing of the harmonics, `N >= (3M + 1)/2`, where `N` is the number of latitudes and `M` is the truncation number.
 
 | Truncation | Number of latitudes | Recommended cores (latitudes per file) |
 | ---        | ---    |  ---       |

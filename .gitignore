@@ -1,6 +1,7 @@
 # Ignore executables #
 ######################
 *.x
+tags
 tests
 trash
 run/bin*

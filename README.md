@@ -11,7 +11,7 @@ The following features were added to the model.
 ## Documentation
 * [input.nml](run/input.nml) is the default namelist file. It allows you to specify various model settings and forcing parameters at run-time, rather than compile-time. Descriptions of each parameter are indicated in comments.
 * [diag_table](run/diag_table) is the "diagnostic table" that specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in comments.
-* [path_names.html](run/path_names.html) provides the full, original model documentation.
+* [path_names.html](src/path_names.html) provides the full, original model documentation.
 * [barotropic.pdf](barotropic.pdf), [shallow.pdf](shallow.pdf), and [spectral.pdf](spectral.pdf) contain background information on the model physical equations.
 
 ## Resolution

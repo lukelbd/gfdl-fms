@@ -1,12 +1,26 @@
 #!/bin/bash
-#------------------------------------------------------------------------------#
+################################################################################
 # Script for compiling fortran source code on various machines.
-#------------------------------------------------------------------------------
+################################################################################
+# Raise error
+raise() {
+  echo "Error: $@" 1>&2
+  exit 1
+}
+# Follow link
+cwd=$(readlink -f ${0})
+cwd=${cwd%/*}
+cd $cwd
 # Variables
-execdir=./bin
-optimization='-O3'
+# Maybe need -lmpl, -lmpichf90, -lmpl, -lm, -lz
+optimization='-O3' # see: hs_katmos2-tgrad_t42l20s_p0060.000p0040.000c/
 ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 cppdefs='-Duse_libMPI -Duse_netCDF'
+optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
+floatflags='-Ktrap=fp' # add =flag1,flag2,... for options; controls floating point exceptions; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
+ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl' # include netcdf libs
+mpflags='-Mmpi=mpich' # special 'pgflags', adds flags -L$MPILIB -lfmpich -lmpich; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
+cppdefs='-Duse_libMPI -Duse_netCDF' # not sure what this does
 
 # Host-specific settings
 case ${HOSTNAME%%.*} in
@@ -14,6 +28,8 @@ case ${HOSTNAME%%.*} in
     # Basic libraries, with links to fortran compilers
     # Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags,
     # so use mpif90/mpiifort (identical) instead of ifort
+    # Also use Intel MPI or openmpi instead of default mpt
+    # See: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/running-jobs/intel-mpi-and-open-mpi
     module load intel &>/dev/null
     module load netcdf &>/dev/null
     module load impi &>/dev/null
@@ -22,14 +38,14 @@ case ${HOSTNAME%%.*} in
     root=$HOME/gfdl-drycore
     fortran=mpiifort
     cpp=mpiicc
-    ldflags='-qopenmp' # misleading name for impi, but this is necessary; see https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
-  ;; monde)
+    ldflags='-qopenmp' # see: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
+  ;; monde) # where code is compiled
     lib=/usr/lib64/mpich/lib
     include=/usr/include/mpich-x86_64
     root=$HOME/gfdl-drycore
     fortran=pgf90
     cpp=pgcc
-    fflags='-Ktrap=fp'
+    fflags='-Ktrap=fp' # see: http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
     ldflags='-Mmpi=mpich'
   ;; euclid) # everything is bunched together
     include=/usr/local/include
@@ -39,22 +55,22 @@ case ${HOSTNAME%%.*} in
     cpp=pgcc
     fflags='-Ktrap=fp'
     ldflags='-Mmpi=mpich'
-  ;; *) echo "Error: Unknown host, must configure library and binary locations before running." && exit 1 ;;
+  ;; *) raise "Unknown host, must configure library and binary locations before running." ;;
 esac
 
 # Directories
 src=$root/src                                  # path to directory containing model source code
-pathnames=$src/path_names_new                  # change this to pick different blocks of code
+pathnames=$src/path_names                      # change this to pick different blocks of code
 mkmf=$root/bin/mkmf                            # path to executable mkmf
 mkmftemplate=$root/bin/mkmf.template           # template of most basic settings
 mppnsource=$root/postprocessing/mppnccombine.c # source code
 # Make sure necessary things tools are in path
-! [ -d $execdir ]      && mkdir $execdir || echo "Warning: Leaving old compiled source."
-! [ -d $src ]          && echo "Error: Could not find source code directory $src."        && exit 1
-! [ -r $pathnames ]    && echo "Error: Could not find path_names file $pathnames."        && exit 1
-! [ -r $mppnsource ]   && echo "Error: Could not find mppnccombine source code."          && exit 1
-! [ -r $mkmftemplate ] && echo "Error: Could not find Makefile template."          && exit 1
-! [ -r $mkmf ]         && echo "Error: Could not find Makefile-generating utility $mkmf." && exit 1
+! [ -d bin ]           && mkdir bin || echo "Warning: Leaving old compiled source."
+! [ -d $src ]          && raise "Could not find source code directory $src."
+! [ -r $pathnames ]    && raise "Could not find path_names file $pathnames."
+! [ -r $mppnsource ]   && raise "Could not find mppnccombine source code."
+! [ -r $mkmftemplate ] && raise "Could not find Makefile template."
+! [ -r $mkmf ]         && raise "Could not find Makefile-generating utility $mkmf."
 
 #------------------------------------------------------------------------------
 # Build executable model code and post-processing tool
@@ -63,10 +79,10 @@ mppnsource=$root/postprocessing/mppnccombine.c # source code
 # NOTE: Don't compile with mpi support, just runs it a bunch of times
 time=$(date +%s)
 echo "Generating mppnccombine executable..."
-$cpp -O -o $execdir/mppnccombine.x -L$lib -I$include $ncflags $mppnsource
+$cpp -O -o bin/mppnccombine.x -L$lib -I$include $ncflags $mppnsource
 
 # Build makefile template (assumes pgi bin is on $PATH)
-cd $execdir # move to source directory
+cd bin # move to source directory
 cat > mkmf.template << DELIM
 CC = $cpp
 FC = $fortran
@@ -83,8 +99,12 @@ echo "Generating Makefile..."
 cat mkmf.template
 $mkmf -p fms.x -t mkmf.template -c "$cppdefs" -a $src $pathnames \
   $src/shared/mpp/include $src/shared/include ${include[@]} # the other include files
+[ $? -ne 0 ] && raise "Mppnccombine compilation failed."
 
 # Compile source
 echo "Compiling source code..."
 make -f Makefile
+[ $? -ne 0 ] && raise "Model compilation failed."
+cp *.x ../ 2>/dev/null
 echo "This script took $(($(date +%s) - $time)) seconds."
+

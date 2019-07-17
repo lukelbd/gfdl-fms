@@ -1,27 +1,49 @@
 "Model results from the Held-Suarez benchmark"
 0 0 0 0 0 0
-# (Above is the experiment name and base time for NetCDF time dimension.)
-# Filenames, 6 fields each:
-# 1) name
-# 2) save-frequency (-1==at end, 0==all, >0==units)
-# 3) save-frequency units 
-# 4) format (1 = netCDF, only supported format)
-# 5) save-time dimension units
-# 6) save-time dimension name
-"2xdaily_inst",  12,   "hours",  1,  "days",  "time",
-# Variables to save, 8 fields each:
-# 1) module name
-# 2) fortran name
-# 3) save name
+# Diagnostic table, describes how model data is saved to NetCDF files
+# First two lines *must* contain the experiment name, and the base time for
+# the time axis. Note this is not a builtin fortran feature; GFDL model just
+# reads and parses this file according to a certain syntax.
+
+# Next lines indicate filenames with 6 comma-separated values
+# 1) file name
+# 2) save-frequency: -1==at end of run, 0==every timestep, >0==units
+# 3) save-frequency units: one of "years", "months", "days", "minutes", "hours", "seconds"
+# 4) file format: 1==NetCDF, the only supported format
+# 5) time axis dimension units: one of "days", "minutes", "hours", "seconds"
+# 6) time axis dimension name
+# You must replace 'filename', 'outfreq', and 'frequnits' before you run
+# the model!
+filename, outfreq, frequnits, 1, "days", "time",
+
+# Next lines indicate variables to save with 8 comma-separated values
+# 1) name of module that can export this variable: e.g. "dynamics" or "forcing"
+# 2) module variable name
+# 3) variable name once saved in NetCDF file
 # 4) file name
-# 5) time-sampling freq for averages
-# 6) whether we take average
-# 7) other options (currently unavailable)
-# 8) save dtype (currently float32)
-# Note: cannot save time-average data in same file as non-time-average data
-"dynamics",   "temp",      "t",     "2xdaily_inst", "all", .false., "none", 2,
-"dynamics",   "ucomp",     "u",     "2xdaily_inst", "all", .false., "none", 2,
-"dynamics",   "vcomp",     "v",     "2xdaily_inst", "all", .false., "none", 2,
-"dynamics",   "height",    "z",     "2xdaily_inst", "all", .false., "none", 2,
-"dynamics",   "slp",       "slp",   "2xdaily_inst", "all", .false., "none", 2,
-"dynamics",   "omega",     "omega", "2xdaily_inst", "all", .false., "none", 2,
+# 5) time-sampling freq for averages: currently only supports averaging over *all* timesteps of the run
+# 6) whether we take time average: if .true., the corresponding file output freq should be -1
+# 7) other options: not implemented, use the dummy string "none"
+# 8) save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
+# Note cannot save time-average data in same file as non-time-average data
+# If you accidentally try to output two vars w/ same name, get silent failure
+"dynamics", "temp",   "t",     filename, "all", .false., "none", 2,
+"dynamics", "ucomp",  "u",     filename, "all", .false., "none", 2,
+"dynamics", "vcomp",  "v",     filename, "all", .false., "none", 2,
+"dynamics", "omega",  "omega", filename, "all", .false., "none", 2,
+"dynamics", "slp",    "slp",   filename, "all", .false., "none", 2,
+"dynamics", "bk",     "hybi",  filename, "all", .false., "none", 2,
+"dynamics", "pk",     "hyai",  filename, "all", .false., "none", 2,
+"forcing",  "tdt",    "tdt",   filename, "all", .false., "none", 2,
+"forcing",  "udt",    "udt",   filename, "all", .false., "none", 2,
+"forcing",  "vdt",    "vdt",   filename, "all", .false., "none", 2,
+# Derivable dynamics params (you can calculate vor from u and v, z from hypsometric):
+# "dynamics", "vor",    "vor", filename, "all", .false., "none", 2,
+# "dynamics", "height", "z",   filename, "all", .false., "none", 2,
+# Mean and anomaly forcing components
+# "forcing",  "tdt_mean", "tdt1",  filename, "all", .false., "none", 2,
+# "forcing",  "tdt_anom", "tdt2",  filename, "all", .false., "none", 2,
+# "forcing",  "udt_mean", "udt1",  filename, "all", .false., "none", 2,
+# "forcing",  "udt_anom", "udt2",  filename, "all", .false., "none", 2,
+# "forcing",  "vdt_mean", "vdt1",  filename, "all", .false., "none", 2,
+# "forcing",  "vdt_anom", "vdt2",  filename, "all", .false., "none", 2,

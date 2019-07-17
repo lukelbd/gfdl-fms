@@ -1169,7 +1169,7 @@ subroutine read_data_3d_new(filename,fieldname,data,domain,timelevel,append_peli
         fname = trim(filename)//trim(pelist_name)
         deallocate(pelist)
      endif
-  endif    
+  endif
 
   is_no_domain = .false.
   if (PRESENT(no_domain)) THEN

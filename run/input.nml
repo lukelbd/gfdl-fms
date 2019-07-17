@@ -1,15 +1,19 @@
-! Primary namelist for running GFDL spectral core
-! * Most names are self-explanatory; alpha has to do with finite differencing scheme,
-!   and damping coefficient is for hyperdiffusion on small scales.
-! * Not sure why num_fourier means truncation number and num_spherical has to be
-!   one more than that, or what happens if this isn't satisfied.
+! Main namelist, controls model integration time
 &main_nml
-  dt_atmos = 600,
-  days     = 1,
-  hours    = 0,
-  minutes  = 0,
-  seconds  = 0,
+  dt_atmos = 0, ! model timestep, will be filled automatically be run script
+  days     = 0, ! days to run, will be filled automatically be run script
+  hours    = 0, ! hours to run
+  minutes  = 0, ! minutes to run
+  seconds  = 0, ! seconds to run
 /
+
+! FMS namelists, controls IO settings. Must increase domains_stack_size 
+! to prevent obscure error with large files. Quote from documentation:
+! "If you increase the model resolution or are running on a small number of
+! processors, you may get the error message `MPP_UPDATE_DOMAINS user stack
+! overflow`. In this case, increase the domain stack size found in the
+! core-specific namelist files. The new stack size should be greater than or
+! equal to the number printed in the error message." 
 &fms_nml
   domains_stack_size = 8000000, ! 8MB, and monde has 32GB RAM
 /
@@ -18,69 +22,77 @@
   fileset_write = 'single',
 /
 
-! Resolution and stuff
+! Spectral dynamics namelist, this controls basic settings like resolution,
+! vertical levels, and some differencing schemes.
 &spectral_dynamics_nml
-  damping_option            = 'resolution_dependent',
-  damping_order             = 4,
-  damping_coeff             = 1.15741e-4,
-  do_mass_correction        = .true.,
-  do_energy_correction      = .true.,
-  do_water_correction       = .false.,
-  use_virtual_temperature   = .false.,
-  vert_advect_uv            = 'second_centered',
-  vert_advect_t             = 'second_centered',
-  longitude_origin          = 0.0,
-  robert_coeff              = 0.04,
-  alpha_implicit            = 0.5,
-  reference_sea_level_press = 101325.,
-  lon_max                   = 128,
-  lat_max                   = 64,
-  num_levels                = 20,
-  num_fourier               = 42,
-  num_spherical             = 43,
-  fourier_inc               = 1,
-  triang_trunc              = .true.,
-  topography_option         = 'flat',
-  vert_coord_option         = 'even_sigma',
-  valid_range_t             = 100., 500.,
+  damping_option            = 'resolution_dependent', ! diffusion option
+  damping_order             = 4,                      ! correspons to del8 diffusion
+  damping_coeff             = 1.15741e-4,             ! diffusion strength
+  do_mass_correction        = .true.,                 ! prevent changing mean surface pressure?
+  do_energy_correction      = .true.,                 ! prevent changing total kinetic and potential energy?
+  do_water_correction       = .false.,                ! prevent changing atmospheric water vapor? (for aquaplanet)
+  use_virtual_temperature   = .false.,                ! consider moisture in computation of geopotential (for aquaplanet)
+  vert_advect_uv            = 'second_centered',      ! vertical advection scheme for horizontal wind
+  vert_advect_t             = 'second_centered',      ! vertical advection scheme for temperature
+  longitude_origin          = 0.0,                    ! origin for output NetCDF files
+  robert_coeff              = 0.04,                   ! has to do with time-integration scheme
+  alpha_implicit            = 0.5,                    ! implicit gravity wave scheme -- 0.5 is centered, 1.0 is backward
+  lon_max                   = 128,                    ! number of longitudes (should be consistent with truncation number)
+  lat_max                   = 64,                     ! number of latitudes (should be consistent with truncation number)
+  num_levels                = 20,                     ! number of vertical levels
+  num_fourier               = 42,                     ! truncation number
+  num_spherical             = 43,                     ! generally must equal num_fourier + 1
+  fourier_inc               = 1,                      ! number of sectors for dividing up spectral model
+  triang_trunc              = .true.,                 ! triangular or rhomboidal truncation?
+  topography_option         = 'flat',                 ! 'flat' for no topography, 'input' to use a NetCDf file in INPUT
+  vert_coord_option         = 'even_sigma',           ! 'input' to use &vert_coordinate_nml, 'pk_sigma' for Polvani and Kushner (2002) spacing, 'even_sigma' for evenly spaced sigma, and a few other options
+  valid_range_t             = 100., 500.,             ! model fails if temperatures exceed this range
+  reference_sea_level_press = 101325.,                ! atmospheric mass
 /
 
-! Forcing namelist for GFDL model compiled with code for the
-! modified Polvani-Kushner version
-! Parentheses (pk/dbt), (pk), (dbt) indicate when parameters apply
-! only to a particular forcing scheme. By default they apply to the hs scheme,
-! i.e. HS94.
+! Forcing namelist, with new parameters for configuring new forcing schemes
+! Note for all damping parameters, a positive value means seconds, negative
+! means days, and zero means off (no damping). To apply damping to mean and
+! anomaly components separately, specify in the namelist e.g. ktrop = -40, 0,
+! This syntax indicates you are setting a length-2 array.
 &forcing_nml
   no_forcing      = .false.,    ! turn off forcing altogether (same as setting each 'k' to zero)
-  strat_mode      = 'pk',       ! can be hs, pk, or dbt (i.e. my custom stuff)
-  strat_vtx       = .true.,     ! (pk/dbt) turn on and off the polar vortex
-  strat_sponge    = .true.,     ! (pk/dbt) turn on sponge
-  strat_damp      = 'constant', ! (dbt) linear: transition from kstrat at tropopause to kmeso at TOA linearly; constant: use kstrat everywhere in
+  input_heating   = .false.,    ! use input file for diabatic heating
+  teq_mode        = 'hs',       ! can be hs, pk, or pkmod (i.e. my custom stuff)
+  damp_mode       = 'hs',       ! can be hs, pk, or pkmod (i.e. my custom stuff)
+  conserve_energy = .true.,     ! employ frictional warming
   surf_schneider  = .true.,     ! conserve mean surface temp when delh is changed?
-  t_mean          = 300.,       ! mean surface temp
-  t_zero          = 315.,       ! temp at equator surface
-  t_strat         = 200.,       ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
-  delh            = 60.,        ! equator-pole temp contrast
-  delv            = 10.,        ! lapse rate scaling, probably should be left alone
-  eps             = 0.,         ! seasons; delh=delh+eps in north hemisphere, delh=delh-eps in south hemisphere
+  strat_vtx       = .true.,     ! (pk/pkmod) turn on and off the polar vortex
+  strat_sponge    = .true.,     ! (pk/pkmod) turn on sponge
+  strat_damp      = 'constant', ! (pkmod) 'linear': transition from kstrat at tropopause to kmeso at TOA linearly; 'constant': use kstrat everywhere in
+  t_mean          = 300.0,      ! mean surface temp
+  t_zero          = 315.0,      ! temp at equator surface
+  t_strat         = 200.0,      ! using pk stratosphere, will *offset* US standard temperature by <this> minus 216.65
+  delh            = 60.0,       ! equator-pole temp contrast
+  delv            = 10.0,       ! lapse rate scaling, probably should be left alone
+  eps             = 0.0,        ! adds seasons; delh=delh+eps in north hemisphere, delh=delh-eps in south hemisphere
   exp_h           = 0,          ! positive number shifts baroclinic zone poleward from hs, negative equatorward
   exp_b           = 4,          ! cosine latitude exponent for boundary layer damping equation; Shneider uses 8, Held-Suarez 4
   sigma_b         = 0.7,        ! boundary level; below which friction and elevated thermal damping start
-  z_pkswitch      = 16.,        ! (pk) flat level above which Polvani-Kushner strat begins (km)
-  z_kdepth        = 5.,         ! (dbt) depth of transition region for troposphere-to-stratosphere damping
-  lat_trop_ref    = 0.,         ! (dbt) latitude at which we use exact US standard atmosphere; everywhere else, it is warped
-  p_sponge        = 0.5,        ! (pk/dbt) level above which sponge on winds is applied (hPa)
-  p_logeval       = 200.,       ! (dbt) pressure at which we evaluate the log(p/p0) when inverting Held-Suarez
-  vtx_edge        = 50.,        ! (pk/dbt) edge of the vortex
-  vtx_wid         = 20.,        ! (pk/dbt) width of the vortext-US standard atmosphere transition region
-  vtx_gam         = 2.,         ! (pk/dbt) lapse rate in polar vortex region (K/km), paper uses 2 and 4
-  ksponge         = -0.5,       ! (pk/dbt) sponge damping rate
-  kfric           = -1.,        ! friction damping rate
-  kbl             = -4.,        ! maximum boundary layer thermal damping, realized at equatorial surface
-  ktrop           = -40.,       ! troposphere damping (if hs, also applies in stratosphere)
-  kstrat          = -40.,       ! (pk/dbt) stratosphere damping
-  kmeso           = -4.,        ! (pk/dbt) damping rate at upper boundary, Holton-Mass style
-  trsink          = -4.,        ! tracer stuff
-  trflux          = 1.e-5,      ! tracer stuff
-  conserve_energy = .true.,     ! employ frictional warming
+  z_ozone         = 20.0,       ! (pk) level at which stratospheric warming begins for U.S. standard atmosphere (km)
+  z_kdepth        = 5.0,        ! (pkmod) depth of transition region for troposphere-to-stratosphere damping
+  lat_ref         = 0.0,        ! (pkmod) latitude at which we use exact US standard atmosphere; everywhere else, it is warped
+  p_sponge        = 0.5,        ! (pk/pkmod) level above which sponge on winds is applied (hPa)
+  p_logeval       = 200.0,      ! (pkmod) pressure at which we evaluate the log(p/p0) when inverting Held-Suarez
+  vtx_edge        = 50.0,       ! (pk/pkmod) edge of the vortex
+  vtx_width       = 20.0,       ! (pk/pkmod) width of the vortext-US standard atmosphere transition region
+  vtx_gamma       = 2.0,        ! (pk/pkmod) lapse rate in polar vortex region (K/km), paper uses 2 and 4
+  ksponge         = -0.5,       ! (pk/pkmod) sponge damping rate
+  kfric           = -1.0,       ! friction damping rate
+  kbl             = -4.0,       ! maximum boundary layer thermal damping, realized at equatorial surface
+  ktrop           = -40.0,      ! troposphere damping (if hs, also applies in stratosphere)
+  kstrat          = -40.0,      ! (pk/pkmod) stratosphere damping
+  kmeso           = -4.0,       ! (pk/pkmod) damping rate at upper boundary, Holton-Mass style
+  trsink          = -4.0,       ! damping timescale for tracer, if tracers are registered
+  trflux          = 1.e-5,      ! surface flux for tracer, if tracers are registered
+  q0_tropical     = 0.0,        ! amplitude for Butler upper-troposphere tropical heating
+  q0_vortex       = 0.0,        ! amplitude for Butler polar vortex heating
+  q0_arctic       = 0.0,        ! amplitude for Butler Arctic surface heating
+  q0_global       = 0.0,        ! globally uniform heating
+  q0_surface      = 0.0,        ! average strength of boundary layer heating, that decays linearly from surface to top of boundary layer
 /

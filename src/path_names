@@ -1,4 +1,4 @@
-atmos_param/forcing/orig_forcing.f90
+atmos_param/forcing/forcing.f90
 atmos_shared/vert_advection/vert_advection.f90
 atmos_solo/atmos_model.f90
 atmos_spectral/driver/solo/atmosphere.f90

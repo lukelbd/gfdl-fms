@@ -114,23 +114,23 @@ character(len=32), parameter :: default_hole_filling   = 'off'
 !===============================================================================================
 ! namelist variables
 
-logical :: do_mass_correction     = .true. , &
-           do_water_correction    = .true. , &
-           do_energy_correction   = .true. , &
-           use_virtual_temperature= .false., &
-           use_implicit           = .true.,  &
-           triang_trunc           = .true.
+logical :: do_mass_correction      = .true. , &
+           do_water_correction     = .true. , &
+           do_energy_correction    = .true. , &
+           use_virtual_temperature = .false., &
+           use_implicit            = .true.,  &
+           triang_trunc            = .true.
 
-integer :: damping_order       = 2, &
-           damping_order_vor   =-1, &
-           damping_order_div   =-1, &
-           lon_max             = 128, & ! T42
-           lat_max             = 64,  & ! T42
-           num_fourier         = 42,  & ! T42
-           num_spherical       = 43,  & ! T42
-           fourier_inc         = 1,   &
-           num_levels          = 18,  &
-           num_steps           = 1
+integer :: damping_order       =  2, &
+           damping_order_vor   = -1, &
+           damping_order_div   = -1, &
+           lon_max             =  128, & ! T42
+           lat_max             =  64,  & ! T42
+           num_fourier         =  42,  & ! T42
+           num_spherical       =  43,  & ! T42
+           fourier_inc         =  1,   &
+           num_levels          =  18,  &
+           num_steps           =  1
 
 integer, dimension(2) ::  print_interval=(/1,0/)
 

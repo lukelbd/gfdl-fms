@@ -153,8 +153,8 @@ driver() {
   ! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
   ncfiles=(*.nc) # each output file
   # Remove some files
-  [ -r INPUT/topography.data.nc ] && rm INPUT/topography.data.nc # remove topography
-  [ -d INPUT ] && rm -r INPUT # remove everything
+  [ -d INPUT ] && [ $cday -gt 0 ] && rm -rf INPUT # remove everything
+  [ -r logfile.0000.out ] && mv logfile.0000.out log.init # contains init info
   rm fms.x # remove executable, because it takes up space
 }
 
@@ -164,19 +164,15 @@ driver() {
 ################################################################################
 # Take one argument: directory where restart files exist
 copy_restart() {
-  # Copy over relevant restart files for exp type; if missing, raise error
+  # Move restart files
   local rdir=$1 # the restart direcotry
   [ $# -ne 1 ] && echo "Error: copy_restart() function takes exactly 1 argument." && exit 1
-  if ! [ -d "$rdir" ] || ! [ -d "$rdir/RESTART" ] || [ -z "$(ls $rdir/RESTART/* 2>/dev/null)" ]; then
+  if ! [ -d "$rdir" ] || ! [ -d "$rdir/RESTART" ] || [ -z "$(ls $rdir/RESTART/*.nc 2>/dev/null)" ] || ! [ -r "$rdir/RESTART/atmos_model.res" ]; then
     echo "Error: Restart directory $rdir/RESTART does not exist, or is empty." && exit 1
   fi
-  resfiles="atmos_model.res atmosphere.res.nc spectral_dynamics.res.nc"
-  # resfiles="atmos_model.res atmos_tracers.res.nc fv_rst.res.nc fv_srf_wnd.res.nc" # fv type
-  # resfiles="atmos_model.res atmos_tracers.res.nc bgrid_prog_var.res.nc" # brid type
   echo "Moving restart files from ${rdir##*/}/RESTART to ${PWD##*/}/INPUT..."
-  for file in $resfiles; do
-    ! [ -r $rdir/RESTART/$file ] && echo "Error: Missing restart file ${rdir##*/}/RESTART/${file}." && exit 1
-    cp $rdir/RESTART/$file INPUT/$file
+  for file in $rdir/RESTART/*; do
+    cp $file INPUT/${file##*/}
   done
 }
 

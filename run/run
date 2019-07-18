@@ -27,6 +27,7 @@ cwd=$(pwd)
 shopt -u nullglob   # google this
 ulimit -s unlimited # set max open files
 mpibin=/usr/lib64/mpich/bin
+process=./process
 export PATH="$mpibin:$PATH" # add mpi executable to path
 # Error
 raise() {
@@ -36,7 +37,7 @@ raise() {
 }
 # Get global namelist value
 nml_parse() {
-  [ ! -r "$cwd/input.nml" ]  && raise "input.nml file not found."
+  [ -r "$cwd/input.nml" ] || raise "input.nml file not found."
   cat input.nml | sed 's/!.*//g' | grep "$1" | cut -d= -f2 | tr -d "\t ,'\""
 }
 # Replace namelist value
@@ -79,9 +80,7 @@ done
 # Check that exe is available
 # You should copy the exe from whichever compile script
 fms=$cwd/fms.x                   # model executable
-mppnccombine=$cwd/mppnccombine.x # netcdf combine executable
 ! [ -x $fms ]  && raise "The executable $fms is missing."
-! [ -x $mppnccombine ] && raise "The executable $mppnccombine is missing."
 # Exit from script if directory already exists
 $newexp && [ -d $expdir ] && raise "Working directory already exists."
 if ! [ -d $expdir ]; then
@@ -177,22 +176,13 @@ run_model() {
   # the exit status/mpirun doesn't pass that exit status, which is dumb. So we'll parse the logfile.
   grep 'EXIT CODE: [1-9]' log.model &>/dev/null && raise "Bad exit code from model run step."
   echo "Time for integration: $(($(date +%s) - $t))s."
-  # Combine the parallel-output netcdf files with the GFDL-provided 'mppnccombine' tool (stands for massively parallel processing netcdf-combine)
+  # Process the results
   t=$(date +%s)
   for ncfile in *.nc.0000; do # for each output filename -- e.g. 4xdaily_inst.nc.XXXX, averages.nc.XXXX, etc.
-    # Get list of files to combine
     [[ "$ncfile" =~ "*" ]] && raise "No netcdf files found."
-    files=(${ncfile%%.*}.nc*) # glob expands into "bash array" of files; the %%.* is a "parameter expansion" (google this)
-    # Combine files
-    echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
-    $mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
-    [ $? -ne 0 ] && raise "mppnccombine failed."
-    mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc
+    $process "$ncfile"
   done
-  echo "Time for combining files: $(($(date +%s) - $t))s."
-  # Initialize directory for output
-  ! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
-  ncfiles=(*.nc) # each output file
+  echo "Time for processing files: $(($(date +%s) - $t))s."
   # Remove some files
   [ -d INPUT ] && [ $cday -gt 0 ] && rm -rf INPUT # remove everything
   [ -r logfile.0000.out ] && mv logfile.0000.out log.init # contains init info

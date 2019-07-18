@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#------------------------------------------------------------------------------#
+# This script processes results as they are produced by the model
+#------------------------------------------------------------------------------#
+# Check
+source header.sh
+ncfile="$1"
+files=(${ncfile%%.*}.nc*) # glob expands into "bash array" of files; the %%.* is a "parameter expansion" (google this)
+mppnccombine=${0%/*}/mppnccombine.x # netcdf combine executable
+! [ -x $mppnccombine ] && raise "$mppnccombine is missing or is not executable."
+# Merge
+echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
+! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
+$mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
+[ $? -ne 0 ] && raise "mppnccombine failed."
+mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc

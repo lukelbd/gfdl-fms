@@ -1,31 +1,42 @@
 #!/bin/bash
-################################################################################
-# This script runs GFDL dry core model successively in folders named dXXXX-dYYYY
-# within the directory "expdir", combines the multiple netcdf files produced in parallel,
-# and moves them to a folder named "netcdf".
-# Usage: ./simple_run <expdir> [flags]
-#        ./simple_run [flags] <expdir>
-# Flags:
-#   --resume              (do not overwrite old results in dXXXX-dYYYY folders?)
-#   --newexp              (do not write to existing experiment folder?)
-#   --cores=<cores>       (default 8)
-#   --start=<day>         (default 0)
-#   --end=<day>           (required)
-#   --restart=<directory> (default is empty [i.e. a "cold start"])
-# See the case/esac block below for more information.
-# Your experiment directory "expdir" should be in one of the scratch directories.
-################################################################################
+usage='drycore_run [OPTION...] DIR'
+doc="This script runs GFDL dry core model successively in folders named dXXXX-dYYYY
+within the directory DIR, combines the multiple netcdf files produced in parallel,
+and moves them to a folder named 'netcdf'.
+
+Usage
+
+  $usage
+
+Positional arguments
+
+  DIR  The directory in which model will be run.
+
+Optional arguments
+
+  -h|--help          Print this message.
+  -n|--new           Exit if experiment folder already exists.
+  -r|--resume        Exit if particular run block already exists. Use this to continue interrupted runs.
+  [-c|--cores]=*     The number of cores to parallelize over.
+  [-ts|--tstart]=*   The initial day. Can use this to continue from another run.
+  [-te|--tend]=*     The final day.
+  [-rd|--restart]=*  The initial restart directory.
+"
+# Initial stuff
 cwd=$(pwd)
 shopt -u nullglob   # google this
 ulimit -s unlimited # set max open files
 mpibin=/usr/lib64/mpich/bin
 export PATH="$mpibin:$PATH" # add mpi executable to path
-
-################################################################################
-# Simple function for reading values set in namelist
-################################################################################
+# Error
+raise() {
+  echo "Usage: $usage" 1>&2
+  echo "Error: $@" 1>&2
+  exit 1
+}
+# Function for reading values set in namelist
 nml_parse() {
-  [ ! -r "$cwd/input.nml" ]  && echo "Error: input.nml file not found."  && exit 1
+  [ ! -r "$cwd/input.nml" ]  && raise "input.nml file not found."
   cat input.nml | sed 's/!.*//g' | grep "$1" | cut -d= -f2 | tr -d "\t ,'\""
 }
 
@@ -40,30 +51,31 @@ resume=false
 days=$(nml_parse days) # number of days in each block
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
-    --newexp)     newexp=true       ;;
-    --resume)     resume=true       ;;
-    --cores=*)    cores=${1#*=}     ;;
-    --start=*)    tstart=${1#*=}    ;;
-    --end=*)      tend=${1#*=}      ;;
-    --restart=*)  roverride=${1#*=} ;;
-    -*) echo "Error: Unknown flag \"$1\"." && exit 1 ;;
-    *)  [ -n "$expdir" ] && echo "Error: More than one experiment directory specified." && exit 1
+    -h|--help) echo "$doc" && exit 0  ;;
+    -n|--new)          newexp=true    ;;
+    -r|--resume)       resume=true    ;;
+    -c=*|--cores=*)    cores=${1#*=}  ;;
+    -ts=*|--start=*)   tstart=${1#*=} ;;
+    -te=*|--end=*)     tend=${1#*=}   ;;
+    -rd=*|--restart=*) rinit=${1#*=}  ;;
+    -*) raise "Unknown flag \"$1\"." ;;
+    *)  [ -n "$expdir" ] && raise "More than one experiment directory specified."
       expdir="$1" ;;
   esac; shift # shift by at least one
 done
-[ -z $expdir ] && echo "Error: You must declare the experiment directory." && exit 1
-[ -z $tend ] && echo "Error: You must declare the end day." && exit 1
+[ -z $expdir ] && raise "You must declare the experiment directory."
+[ -z $tend ] && raise "You must declare the end day."
 # Check that exe is available
 # You should copy the exe from whichever compile script
 fms=$cwd/fms.x                   # model executable
 mppnccombine=$cwd/mppnccombine.x # netcdf combine executable
-! [ -x $fms ]  && echo "Error: The executable $fms is missing." && exit 1
-! [ -x $mppnccombine ] && echo "Error: The executable $mppnccombine is missing." && exit 1
+! [ -x $fms ]  && raise "The executable $fms is missing."
+! [ -x $mppnccombine ] && raise "The executable $mppnccombine is missing."
 # Exit from script if directory already exists
-$newexp && [ -d $expdir ] && echo "Error: Working directory already exists. Continuing..." && exit 1
+$newexp && [ -d $expdir ] && raise "Working directory already exists."
 if ! [ -d $expdir ]; then
   mkdir $expdir # make directory
-  [ $? -ne 0 ] && echo "Error: Could not create experiment directory \"$expdir\"." && exit 1
+  [ $? -ne 0 ] && raise "Could not create experiment directory \"$expdir\"."
 fi
 
 ################################################################################
@@ -78,7 +90,7 @@ dir_setup() {
   # Set up working directory, and move there
   # Action depends on settings
   wdir="$1" # where to move files
-  [ $# -ne 1 ] && echo "Error: dir_setup() functions requires exactly 1 argument." && exit 1
+  [ $# -ne 1 ] && raise "dir_setup() functions requires exactly 1 argument."
   if ! [ -d $wdir ]; then
     # Directory does not exist, just create if from scratch
     resume=false
@@ -87,7 +99,8 @@ dir_setup() {
     # Directory exists
     # Check if this directory contains finished results
     if ! [ -z "$(\ls $wdir/RESTART 2>/dev/null)" ]; then # need to check RESTART folder is non-empty
-      echo "Working directory ${wdir##*/} contains completed integration. Cancelling..." && return 1
+      echo "Working directory ${wdir##*/} contains completed integration. Cancelling..."
+      return 1
     fi
     # If not, we are "resuming" the experiment run at this timestep
     resume=false
@@ -100,62 +113,23 @@ dir_setup() {
   fi
   # Make directory and move stuff over
   mkdir $wdir
-  [ $? -ne 0 ] && echo "Error: Could not create working directory \"$wdir\"." && return 1
+  [ $? -ne 0 ] && raise "Could not create working directory \"$wdir\"."
   cd $wdir
   cp $fms ./fms.x   # move executable inside (declared at top of file)
   mkdir RESTART     # model spits out stuff here, can be accepted as input to new iteration
   mkdir INPUT       # model reads from this
   touch field_table # just put empty file, if want no tracers
   # Copy files over
-  ! [ -r "$cwd/input.nml" ]  && echo "Error: input.nml file not found."  && exit 1
-  ! [ -r "$cwd/diag_table" ] && echo "Error: diag_table file not found." && exit 1
-  # cp $cwd/input.nml  ./
+  ! [ -r "$cwd/input.nml" ]  && raise "input.nml file not found."
+  ! [ -r "$cwd/diag_table" ] && raise "diag_table file not found."
   cat $cwd/input.nml | sed 's/!.*//g' | sed 's/[ \t]*$//g' | sed $'/^[ \t]*$/d' >./input.nml
   cp $cwd/diag_table ./
   topo=$(nml_parse topography_option) # use helper function
   if [ "$topo" == "input" ]; then
-    ! [ -r $cwd/topography.data.nc ] && echo "Error: Topography file not available." && exit 1
+    ! [ -r $cwd/topography.data.nc ] && raise "Topography file not found"
     cp $cwd/topography.data.nc INPUT
   fi
   return 0
-}
-
-################################################################################
-# Function for running the next model step from a previous step
-################################################################################
-driver() {
-  local rdir=$1 # the restart direcotry
-  [ $# -ne 1 ] && echo "Error: driver() function takes exactly 1 argument." && exit 1
-  t=$(date +%s)
-  echo "Running model..."
-  # Use mpirun to run model in parallel (note mpirun must be on path)
-  ! which mpirun &>/dev/null && echo "Error: mpirun not found in \$PATH: $PATH." && exit 1
-  mpirun -np $cores ./fms.x &>log.model # need ./fms.x, not fms
-  # Check that model ran successfully
-  # FMS prints to standard output 'EXIT CODE: 1' but doesn't actually set
-  # the exit status/mpirun doesn't pass that exit status, which is dumb. So we'll parse the logfile.
-  grep 'EXIT CODE: [1-9]' log.model &>/dev/null && echo "Error: Bad exit code from model run step." && exit 1
-  echo "Time for integration: $(($(date +%s) - $t))s."
-  # Combine the parallel-output netcdf files with the GFDL-provided 'mppnccombine' tool (stands for massively parallel processing netcdf-combine)
-  t=$(date +%s)
-  for ncfile in *.nc.0000; do # for each output filename -- e.g. 4xdaily_inst.nc.XXXX, averages.nc.XXXX, etc.
-    # Get list of files to combine
-    [[ "$ncfile" =~ "*" ]] && echo "Error: No netcdf files found." && exit 1 # make sure nullglob turned off
-    files=(${ncfile%%.*}.nc*) # glob expands into "bash array" of files; the %%.* is a "parameter expansion" (google this)
-    # Combine files
-    echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
-    $mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
-    [ $? -ne 0 ] && echo "Error: mppnccombine failed." && exit 1
-    mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc
-  done
-  echo "Time for combining files: $(($(date +%s) - $t))s."
-  # Initialize directory for output
-  ! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
-  ncfiles=(*.nc) # each output file
-  # Remove some files
-  [ -d INPUT ] && [ $cday -gt 0 ] && rm -rf INPUT # remove everything
-  [ -r logfile.0000.out ] && mv logfile.0000.out log.init # contains init info
-  rm fms.x # remove executable, because it takes up space
 }
 
 ################################################################################
@@ -166,14 +140,52 @@ driver() {
 copy_restart() {
   # Move restart files
   local rdir=$1 # the restart direcotry
-  [ $# -ne 1 ] && echo "Error: copy_restart() function takes exactly 1 argument." && exit 1
+  [ $# -ne 1 ] && raise "copy_restart() function takes exactly 1 argument."
   if ! [ -d "$rdir" ] || ! [ -d "$rdir/RESTART" ] || [ -z "$(ls $rdir/RESTART/*.nc 2>/dev/null)" ] || ! [ -r "$rdir/RESTART/atmos_model.res" ]; then
-    echo "Error: Restart directory $rdir/RESTART does not exist, or is empty." && exit 1
+    raise "Restart directory $rdir/RESTART does not exist, or is empty."
   fi
   echo "Moving restart files from ${rdir##*/}/RESTART to ${PWD##*/}/INPUT..."
   for file in $rdir/RESTART/*; do
     cp $file INPUT/${file##*/}
   done
+}
+
+################################################################################
+# Function for running the next model step from a previous step
+################################################################################
+run_model() {
+  local rdir=$1 # the restart direcotry
+  [ $# -ne 1 ] && raise "run_model() function takes exactly 1 argument."
+  t=$(date +%s)
+  echo "Running model..."
+  # Use mpirun to run model in parallel (note mpirun must be on path)
+  ! which mpirun &>/dev/null && raise "mpirun not found in \$PATH: ${PATH}."
+  mpirun -np $cores ./fms.x &>log.model # need ./fms.x, not fms
+  # Check that model ran successfully
+  # FMS prints to standard output 'EXIT CODE: 1' but doesn't actually set
+  # the exit status/mpirun doesn't pass that exit status, which is dumb. So we'll parse the logfile.
+  grep 'EXIT CODE: [1-9]' log.model &>/dev/null && raise "Bad exit code from model run step."
+  echo "Time for integration: $(($(date +%s) - $t))s."
+  # Combine the parallel-output netcdf files with the GFDL-provided 'mppnccombine' tool (stands for massively parallel processing netcdf-combine)
+  t=$(date +%s)
+  for ncfile in *.nc.0000; do # for each output filename -- e.g. 4xdaily_inst.nc.XXXX, averages.nc.XXXX, etc.
+    # Get list of files to combine
+    [[ "$ncfile" =~ "*" ]] && raise "No netcdf files found."
+    files=(${ncfile%%.*}.nc*) # glob expands into "bash array" of files; the %%.* is a "parameter expansion" (google this)
+    # Combine files
+    echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
+    $mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
+    [ $? -ne 0 ] && raise "mppnccombine failed."
+    mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc
+  done
+  echo "Time for combining files: $(($(date +%s) - $t))s."
+  # Initialize directory for output
+  ! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
+  ncfiles=(*.nc) # each output file
+  # Remove some files
+  [ -d INPUT ] && [ $cday -gt 0 ] && rm -rf INPUT # remove everything
+  [ -r logfile.0000.out ] && mv logfile.0000.out log.init # contains init info
+  rm fms.x # remove executable, because it takes up space
 }
 
 ##############################################################################
@@ -193,15 +205,17 @@ while [ $nday -le $tend ]; do
   # Optionally use the end of other control runs to reduce spinup time
   rdir=$expdir/d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
   cdir=$expdir/d$(printf "%04d" $cday)-d$(printf "%04d" $nday)
-  if ! [ -z $roverride ]; then coldstart=false
-    if ! [[ $roverride =~ d.*-d.* ]]; then
-      echo "Override: Using final day from \"$roverride\" for restart files."
-      roverride=($roverride/d*-d*); rdir="${roverride[-1]}" # pick last one; the glob expansion will return a sorted list of names
+  if ! [ -z $rinit ]; then coldstart=false
+    if ! [[ $rinit =~ d.*-d.* ]]; then
+      echo "Override: Using final day from \"$rinit\" for restart files."
+      rinit=($rinit/d*-d*)
+      rdir="${rinit[-1]}" # pick last one; the glob expansion will return a sorted list of names
     else
-      echo "Override: Using restart files from \"$roverride\"."
-      rdir="$roverride" # use specific day sequence
-    fi; unset roverride # only ever use this on first 'day' of a new experiment; for subsequent days, continue from earlier day block
-    ! [ -d $rdir ] && echo "Error: Override restart directory \"$rdir\" does not exist." && exit 1
+      echo "Override: Using restart files from \"$rinit\"."
+      rdir="$rinit" # use specific day sequence
+    fi
+    unset rinit # only ever use this on first 'day' of a new experiment; for subsequent days, continue from earlier day block
+    ! [ -d $rdir ] && raise "Override restart directory \"$rdir\" does not exist."
   fi
   dir_setup $cdir # sets up working directory, cd into it
   if [ $? -eq 0 ]; then # setup returns 1 if directory is present and 'resume' option is set
@@ -210,7 +224,7 @@ while [ $nday -le $tend ]; do
     else
       echo "Cold start."
     fi
-    driver $rdir # run model
+    run_model $rdir # run model
   fi
   # Step things forward, for next iteration
   pday=$cday

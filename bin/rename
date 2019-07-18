@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# This file renames modules found throughout the project
+# This can be used to rename modules that appear throughout the code
 # cat "$f" | grep "$pattern"
 dryrun=false
 pattern="$1"

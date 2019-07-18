@@ -1,5 +1,5 @@
 #!/bin/bash
-usage='drycore_run [OPTION...] DIR'
+usage='run [-hnr] [-c|--cores]=CORES [-dt|--dt]=DT [-d|--days]=DAYS [-ts|--tstart]=START [-te|--tend]=END DIR'
 doc="This script runs GFDL dry core model successively in folders named dXXXX-dYYYY
 within the directory DIR, combines the multiple netcdf files produced in parallel,
 and moves them to a folder named 'netcdf'.
@@ -34,10 +34,22 @@ raise() {
   echo "Error: $@" 1>&2
   exit 1
 }
-# Function for reading values set in namelist
+# Get global namelist value
 nml_parse() {
   [ ! -r "$cwd/input.nml" ]  && raise "input.nml file not found."
   cat input.nml | sed 's/!.*//g' | grep "$1" | cut -d= -f2 | tr -d "\t ,'\""
+}
+# Replace namelist value
+nml_replace() { # first argument is param name, second argument is value
+  while [ $# -gt 0 ]; do
+    ! grep '^[ \t]*\b'"${1}"'\b' ./input.nml &>/dev/null && \
+      raise "Param \"${1}\" not found in namelist."
+    space='\([ \t]*\)' # space atom; more readable to set it as a variable
+    echo "Replacing \"${1}\" with ${2}."
+    sed -i 's/^'"${space}${1}${space}"'='"${space}"'.*$/\1'"${1}"'\2=\3'"${2}"',/g' ./input.nml
+    shift 2
+    [ $? -ne 0 ] && raise "Must pass even number of params to nml_replace function."
+  done
 }
 
 ################################################################################
@@ -48,7 +60,6 @@ cores=4
 tstart=0
 newexp=false
 resume=false
-days=$(nml_parse days) # number of days in each block
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
     -h|--help) echo "$doc" && exit 0  ;;
@@ -105,11 +116,11 @@ dir_setup() {
     # If not, we are "resuming" the experiment run at this timestep
     resume=false
     echo "Working directory ${wdir##*/} contains unfinished integration. Starting over..."
-    rm -r $wdir
+    rm -rf $wdir
   else
     # Delete the folder, we don't care what's in it
     echo "Working directory ${wdir##*/} already exists. Deleting..."
-    rm -r $wdir
+    rm -rf $wdir
   fi
   # Make directory and move stuff over
   mkdir $wdir
@@ -118,12 +129,12 @@ dir_setup() {
   cp $fms ./fms.x   # move executable inside (declared at top of file)
   mkdir RESTART     # model spits out stuff here, can be accepted as input to new iteration
   mkdir INPUT       # model reads from this
-  touch field_table # just put empty file, if want no tracers
   # Copy files over
   ! [ -r "$cwd/input.nml" ]  && raise "input.nml file not found."
   ! [ -r "$cwd/diag_table" ] && raise "diag_table file not found."
   cat $cwd/input.nml | sed 's/!.*//g' | sed 's/[ \t]*$//g' | sed $'/^[ \t]*$/d' >./input.nml
   cp $cwd/diag_table ./
+  cp $cwd/field_table ./
   topo=$(nml_parse topography_option) # use helper function
   if [ "$topo" == "input" ]; then
     ! [ -r $cwd/topography.data.nc ] && raise "Topography file not found"
@@ -192,6 +203,7 @@ run_model() {
 # Run the model in blocks of $days days for control
 ##############################################################################
 echo "Running control experiment from day $tstart to day $tend."
+days=$(nml_parse days) # number of days in each block
 coldstart=true # assume cold start by default
 origin=$(date +%s) # start time
 pday=$(($tstart - $days)) # only time when we do minus days

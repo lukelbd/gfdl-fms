@@ -12,9 +12,7 @@
 # 4) file format: 1==NetCDF, the only supported format
 # 5) time axis dimension units: one of "days", "minutes", "hours", "seconds"
 # 6) time axis dimension name
-# You must replace 'filename', 'outfreq', and 'frequnits' before you run
-# the model!
-filename, outfreq, frequnits, 1, "days", "time",
+"file", 12, "hours", 1, "days", "time",
 
 # Next lines indicate variables to save with 8 comma-separated values
 # 1) name of module that can export this variable: e.g. "dynamics" or "forcing"
@@ -27,16 +25,16 @@ filename, outfreq, frequnits, 1, "days", "time",
 # 8) save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
 # Note cannot save time-average data in same file as non-time-average data
 # If you accidentally try to output two vars w/ same name, get silent failure
-"dynamics", "temp",   "t",     filename, "all", .false., "none", 2,
-"dynamics", "ucomp",  "u",     filename, "all", .false., "none", 2,
-"dynamics", "vcomp",  "v",     filename, "all", .false., "none", 2,
-"dynamics", "omega",  "omega", filename, "all", .false., "none", 2,
-"dynamics", "slp",    "slp",   filename, "all", .false., "none", 2,
-"dynamics", "bk",     "hybi",  filename, "all", .false., "none", 2,
-"dynamics", "pk",     "hyai",  filename, "all", .false., "none", 2,
-"forcing",  "tdt",    "tdt",   filename, "all", .false., "none", 2,
-"forcing",  "udt",    "udt",   filename, "all", .false., "none", 2,
-"forcing",  "vdt",    "vdt",   filename, "all", .false., "none", 2,
+"dynamics", "temp",   "t",     "file", "all", .false., "none", 2,
+"dynamics", "ucomp",  "u",     "file", "all", .false., "none", 2,
+"dynamics", "vcomp",  "v",     "file", "all", .false., "none", 2,
+"dynamics", "omega",  "omega", "file", "all", .false., "none", 2,
+"dynamics", "slp",    "slp",   "file", "all", .false., "none", 2,
+"dynamics", "bk",     "hybi",  "file", "all", .false., "none", 2,
+"dynamics", "pk",     "hyai",  "file", "all", .false., "none", 2,
+"forcing",  "tdt",    "tdt",   "file", "all", .false., "none", 2,
+"forcing",  "udt",    "udt",   "file", "all", .false., "none", 2,
+"forcing",  "vdt",    "vdt",   "file", "all", .false., "none", 2,
 # Derivable dynamics params (you can calculate vor from u and v, z from hypsometric):
 # "dynamics", "vor",    "vor", filename, "all", .false., "none", 2,
 # "dynamics", "height", "z",   filename, "all", .false., "none", 2,

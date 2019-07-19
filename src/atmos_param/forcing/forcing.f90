@@ -37,6 +37,7 @@ use  diag_manager_mod, only: register_diag_field, send_data
 
 use  field_manager_mod, only: MODEL_ATMOS, parse
 use tracer_manager_mod, only: query_method, get_number_tracers
+use grid_fourier_mod, only:   get_deg_lon
 
 implicit none
 private
@@ -54,7 +55,7 @@ logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
 logical :: surf_schneider = .false. ! HS94 or Schneider surface temp?
-logical :: input_heating = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
+logical :: input_damping = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
 integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
 real :: sigma_b  = 0.7
@@ -64,10 +65,11 @@ real :: vtx_edge = 50.0, vtx_width = 10.0, vtx_gamma = 2.0
 real :: p_ref = 1000.0, p_sponge = 0.5, p_logeval = 200.0
 real :: z_ozone = 20.0, z_kdepth = 50.0 ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
 real :: lat_ref = 0
-real :: q0_tropical = 0.5, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11 ! upper troposphere is default
-real :: q0_vortex = 0.5, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14          ! lower stratosphere is default
-real :: q0_arctic = 0.5, x0_arctic = 1.57, y0_arctic = 1.0
-real :: q0_global = 0.5, q0_surface = 0.5
+real :: q0_tropical = 0.0, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11 ! upper troposphere is default
+real :: q0_vortex = 0.0, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14          ! lower stratosphere is default
+real :: q0_arctic = 0.0, x0_arctic = 1.57, y0_arctic = 1.0
+real :: q0_global = 0.0, q0_surface = 0.0
+real :: q0_lsp = 0.0, m_lsp = 1.0, p0_lsp = 800.0, pt_lsp = 200.0, lat0_lsp = 45.0, slat_lsp = 10.0
 real :: trflux = 1.e-5 ! surface flux for optional tracer
 real :: trsink = -4.   ! damping time for tracer
 !     ----- Account for optional mean, anomaly component damping -----
@@ -82,13 +84,14 @@ real, dimension(2) :: kfric   = fill_value
 real, dimension(2) :: ksponge = fill_value
 
 !-----------------------------------------------------------------------
-namelist /forcing_nml/  no_forcing, input_heating, conserve_energy, &
+namelist /forcing_nml/  no_forcing, input_damping, conserve_energy, &
   teq_mode, damp_mode, strat_sponge, strat_vtx, strat_damp, surf_schneider, &
   t_zero, t_mean, t_strat, exp_h, delh, delv, eps, &
   lat_ref, vtx_edge, vtx_width, vtx_gamma, &
   exp_b, sigma_b, p_sponge, p_logeval, z_ozone, z_kdepth, &
   ktrop, kbl, kstrat, kmeso, kfric, ksponge, &
   trflux, trsink, &
+  q0_lsp, p0_lsp, pt_lsp, lat0_lsp, slat_lsp, &
   q0_tropical, q0_vortex, q0_arctic, q0_global, q0_surface, &
   x0_tropical, y0_tropical, sx_tropical, sy_tropical, &
   x0_vortex, y0_vortex, sx_vortex, sy_vortex, &
@@ -129,10 +132,13 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   integer, intent(in),    dimension(:,:), optional :: kbot
   !-----------------------------------------------------------------------
   real, dimension(size(t,1),size(t,2))             :: ps, diss_heat
-  real, dimension(size(t,1),size(t,2),size(t,3))   :: pmass, udt_sponge, vdt_sponge
+  real, dimension(size(t,1),size(t,2),size(t,3))   :: sigma, pmass ! sigma and mass
+  real, dimension(size(t,1),size(t,2),size(t,3))   :: udt_sponge, vdt_sponge
   real, dimension(size(t,1),size(t,2),size(t,3))   :: teq, tdt_force, tdt_diss, udt_diss, vdt_diss
-  real, dimension(size(t,1),size(t,2),size(t,3),2) :: tdt_damp, tdamp, udt_damp, vdt_damp, rdamp
   real, dimension(size(r,1),size(r,2),size(r,3))   :: rst, rtnd
+  real, dimension(size(t,1),size(t,2),size(t,3),2) :: tdt_damp, tdamp, udt_damp, vdt_damp, rdamp
+  real, dimension(size(t,1))                       :: lon_out
+  real, dimension(size(t,1),size(t,2))             :: lon
   integer :: i, j, k, kb, l, n, num_tracers
   logical :: used
   real    :: flux, sink, value
@@ -141,7 +147,13 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   if (no_forcing) return
   if (.not.module_is_initialized) call error_mesg ('forcing','forcing_init has not been called', FATAL)
 
-  !     Surface pressure
+  !     Get longitude
+  call get_deg_lon(lon_out)
+  do i=is,ie
+    lon(i,:) = lon_out(i)*pi/180.
+  enddo
+
+  !     Surface pressure and sigma coordinates
   if (present(kbot)) then
     do j=1,size(p_half,2)
       do i=1,size(p_half,1)
@@ -152,47 +164,71 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   else
     ps = p_half(:,:,size(p_half,3))
   endif
+  do k=1,size(p_full,3)
+    sigma(:,:,k) = p_full(:,:,k)/ps
+  enddo
 
   !     Rayleigh damping of wind components near the surface
   !     Sponge layer damping of wind components at the top
 
-  call friction_damping ( ps, p_full, u, v, udt_damp, vdt_damp, rdamp, mask )
+  udt_damp = 0.0
+  vdt_damp = 0.0
+  call friction_damping ( sigma, u, v, udt_damp, vdt_damp, rdamp, mask )
 
   udt_sponge = 0.0
   vdt_sponge = 0.0
   if (strat_sponge) then
-    call sponge_damping ( ps, p_full, u, v, udt_sponge, vdt_sponge, mask )
+    ! Apply sponge damping
+    call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, mask )
+    ! Diagnostic output
     if (id_uvdt_sponge > 0) used = send_data(id_uvdt_sponge, sqrt(udt_sponge**2 + vdt_sponge**2), Time, is, js)
     if (id_udt_sponge  > 0) used = send_data(id_udt_sponge, udt_sponge, Time, is, js)
     if (id_vdt_sponge  > 0) used = send_data(id_vdt_sponge, vdt_sponge, Time, is, js)
   endif
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
-  !     Butler et al. (2010) radiative forcing and other forcing
+  !     Alternatively load heating from file
 
   tdt_damp = 0.0
-  tdt_force = 0.0
-  if (input_heating) then
-    call load_heating ( tdt_force )
+  if (input_damping) then
+    call load_damping ( tdt_damp, mask )
   else
-    call thermal_damping ( lat, ps, p_full, t, tdt_damp, tdamp, teq, mask )
-  endif
-  if ((q0_arctic .ne. 0) .or. (q0_tropical .ne. 0) .or. (q0_vortex .ne. 0) .or. (q0_surface .ne. 0) .or. (q0_global .ne. 0)) then
-    call extra_heating ( lat, ps, p_full, t, tdt_force, mask )
+    call thermal_damping ( lat, sigma, p_full, t, tdt_damp, tdamp, teq, mask )
   endif
 
-  !     Optional energy conservation -- dissipate heat proportional to wind reduction
+  !     Butler et al. (2010) radiative forcing and other forcing
+  !     Lindgren et al. (2018) wave heating
+  !     Dissipative heating to conserve energy
+
+  tdt_force = 0.0
+  if ((q0_arctic .ne. 0) .or. (q0_tropical .ne. 0) .or. (q0_vortex .ne. 0)) then
+    call butler_heating ( lat, sigma, tdt_force )
+  endif
+  if (q0_lsp .ne. 0) then
+    call lsp_heating( lon, lat, sigma, tdt_force )
+  endif
+  if (q0_global .ne. 0) then ! global constant heating
+    tdt_force = tdt_force + q0_global / seconds_per_day
+  endif
+  if (q0_surface .ne. 0) then ! reaches maximum strength at surface, decays to zero at boundary layer
+    where (sigma > sigma_b)
+      tdt_force = tdt_force + q0_surface * ((sigma - sigma_b) / (1 - sigma_b)) / seconds_per_day
+    endwhere
+  endif
+  tdt_force = mask * tdt_force
 
   tdt_diss = 0.0
   if (conserve_energy) then
-    ! Apply tempreature tendency due to ke dissipation
+    ! Apply tempreature tendency due to kinetic energy dissipation
     udt_diss = sum(udt_damp,4)
     vdt_diss = sum(vdt_damp,4)
     tdt_diss = -((um + 0.5*udt_diss*dt)*udt_diss + (vm + 0.5*vdt_diss*dt)*vdt_diss)/cp_air
-    ! Outputs
-    if (id_tdt_diss  > 0) used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
+    ! Diagnostic output
+    if (id_tdt_diss  > 0) then
+      used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
+    endif
     if (id_heat_diss > 0) then
-      pmass = p_half(:,:,2:)-p_half(:,:,:size(p_half,3)-1)
+      pmass = p_half(:,:,2:) - p_half(:,:,:size(p_half,3)-1)
       diss_heat = cp_air/grav * sum( tdt_diss*pmass, 3)
       used = send_data(id_heat_diss, diss_heat, Time, is, js)
     endif
@@ -502,16 +538,25 @@ end subroutine forcing_init
 
 subroutine forcing_end 
 
-!-----------------------------------------------------------------------
-!
-!       Routine for terminating forcing module (currently does nothing)
-!
-!-----------------------------------------------------------------------
- module_is_initialized = .false.
+  module_is_initialized = .false.
 
 end subroutine forcing_end
 
-subroutine thermal_damping ( lat, ps, p_full, t, tdt, tdamp, teq, mask )
+subroutine load_damping ( tdt, mask )
+
+  !-----------------------------------------------------------------------
+  !
+  !           Impose forcing loaded from file
+  !
+  !-----------------------------------------------------------------------
+  real, intent(inout), dimension(:,:,:,:) :: tdt
+  real, intent(in), dimension(:,:,:), optional :: mask
+  ! real, dimension(size(tdt,2),size(tdt,3)) :: tdt_mean
+
+end subroutine
+
+
+subroutine thermal_damping ( lat, sigma, p_full, t, tdt, tdamp, teq, mask )
 
 !-----------------------------------------------------------------------
 !
@@ -521,8 +566,8 @@ subroutine thermal_damping ( lat, ps, p_full, t, tdt, tdamp, teq, mask )
 ! Forcing parameters teq and tdamp have longitude dimension, but why?
 ! Easier to multiply with temperature, and allows us to impose longitudinally
 ! varying forcing profile with ease.
-real, intent(in),  dimension(:,:)   :: lat, ps
-real, intent(in),  dimension(:,:,:) :: t, p_full
+real, intent(in),  dimension(:,:)   :: lat
+real, intent(in),  dimension(:,:,:) :: sigma, p_full, t
 real, intent(in),  dimension(:,:,:), optional :: mask
 real, intent(out), dimension(:,:,:)   :: teq
 real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
@@ -530,25 +575,25 @@ real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
 real, dimension(size(t,1),size(t,2)) :: &
   t_surf, t_hs, t_pk, t_summer, t_winter, &
   lat_hfact, lat_vfact, w_vtx, &
-  s, z_full, z_trop, z_offset, p_norm, p_trop, ps_inv ! intermediate containers
+  z_full, z_vortex, z_offset, p_trop, p_norm ! intermediate containers
 real, dimension(size(t,1),size(t,2),2) :: &
   t_decomp, tkhi_decomp, tksurf_decomp ! mean-anomaly decomp containers
 real, dimension(size(t,2)) :: &
   t_bar ! just holds the mean
 real :: p0, pb, pfact
-real :: z_trop_ref, p_trop_ref, t_surf_ref
+real :: z_vortex_ref, p_trop_ref, t_surf_ref
 real :: lat_ref_r, lat_vfact_ref, lat_hfact_ref
 real :: vtx_edge_r, vtx_width_r
 integer :: i, j, k, l, m, seconds, days
 
 !-----------------------------------------------------------------------
 !     Constants
-p0          = p_ref*100.0
-pfact       = p_logeval*100.0/p0
-ps_inv      = 1.0/ps
-lat_ref_r   = lat_ref*pi/180.0 ! latitude for retrieving reference tropopause height
-vtx_width_r = vtx_width*pi/180.0
-vtx_edge_r  = vtx_edge*pi/180.0
+! Note that Lindgren et al 2018 (lsp) wrote sigma_phi = 0.175 * 360/2pi but that is only if latitudes are in degrees, not radians; here they are in radians!
+p0            = p_ref*100.0
+pfact         = p_logeval*100.0/p0
+lat_ref_r     = lat_ref*pi/180.0 ! latitude for retrieving reference tropopause height
+vtx_width_r   = vtx_width*pi/180.0
+vtx_edge_r    = vtx_edge*pi/180.0
 
 !-----------------------------------------------------------------------
 !     Surface temp and damping
@@ -597,7 +642,7 @@ if (trim(teq_mode) .eq. 'pk') then
   ! In PK atmosphere, polar vortex and stratospheric warming both begin at
   ! an arbitrary input height. NOTE: This is slightly different! Stratospheric
   ! warming starts at same level as polar vortex cooling!
-  z_trop = z_ozone
+  z_vortex = z_ozone
   z_offset = (z_ozone - 20.0) ! z_ozone is height at which we want warming begins, 20.0 is default case
 
 else if (trim(teq_mode) .eq. 'pkmod') then
@@ -605,11 +650,10 @@ else if (trim(teq_mode) .eq. 'pkmod') then
   ! stratospheric warming begins at 20km at reference latitude
   p_trop = p0*( t_strat / (t_surf - delv*log(pfact)*lat_vfact) )**(1.0/kappa)
   p_trop_ref = p0*( t_strat / (t_surf_ref - delv*log(pfact)*lat_vfact_ref) )**(1.0/kappa)
-  z_trop = -H*log(p_trop/p0)
-  z_trop_ref = -H*log(p_trop_ref/p0)
-  z_offset = (z_trop - z_trop_ref) + (z_ozone - 20.0) ! includes offset to accomodate configurable standard atmosphere height
+  z_vortex = -H*log(p_trop/p0)
+  z_offset = (z_vortex + H*log(p_trop_ref/p0)) + (z_ozone - 20.0) ! includes offset to accomodate configurable standard atmosphere height
   ! print *, p_trop(0,size(t,2)/8), p_trop(0,size(t,2)/4), p_trop(0,size(t,2)/2)
-  ! print *, z_trop(0,size(t,2)/8), z_trop(0,size(t,2)/4), z_trop(0,size(t,2)/2), z_trop_ref
+  ! print *, z_vortex(0,size(t,2)/8), z_vortex(0,size(t,2)/4), z_vortex(0,size(t,2)/2), z_vortex_ref
   ! print *, z_offset(0,size(t,2)/8), z_offset(0,size(t,2)/4), z_offset(0,size(t,2)/2)
 endif
 
@@ -623,17 +667,16 @@ do k=1,size(t,3)
   ! WARNING: In assignment e.g. a = max(a, 0), end up with float NaNs
   ! when fortran tried to assign the scalar. Some weird fortran thing.
   ! We need two variables for this kind of statement!
-  z_full  = -H*log(p_full(:,:,k)/p0)
-  p_norm  = p_full(:,:,k)/p0
-  s       = p_full(:,:,k)*ps_inv
-  t_hs    = (t_surf - delv*log(p_norm)*lat_vfact) * (p_norm)**kappa
+  z_full = -H*log(p_full(:,:,k)/p0)
+  p_norm = p_full(:,:,k)/p0
+  t_hs   = (t_surf - delv*log(p_norm)*lat_vfact) * (p_norm)**kappa
   if (trim(teq_mode) == 'hs') then
     teq(:,:,k) = max( t_hs, t_strat )
   else
     call tstd_summer( t_strat, z_offset, z_full, t_summer )
-    call tstd_winter( t_strat, vtx_gamma, z_trop, z_full, t_winter )
+    call tstd_winter( t_strat, vtx_gamma, z_vortex, z_full, t_winter )
     t_pk = (1.0 - w_vtx)*t_summer + (w_vtx)*t_winter
-    where (z_full >= z_trop)
+    where (z_full >= z_vortex)
       teq(:,:,k) = max( t_pk, t_min )
     elsewhere
       teq(:,:,k) = max( t_hs, t_strat )
@@ -650,8 +693,8 @@ do k=1,size(t,3)
     ! Alternatively use smooth version below: see Holton-Mass model, 1976 (Journal of Atmospheric Sciences)
     ! tkhi = tkstrat + (1.0 + tanh((z_full-35.0)/7.0))*(tkmeso-tkstrat)/2.0
     if (trim(damp_mode) == 'hs') then
-      where (s > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s-sigma_b)/(1.0-sigma_b)
+      where (sigma(:,:,k) > sigma_b)
+        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(sigma(:,:,k) - sigma_b)/(1.0-sigma_b)
       elsewhere
         tdamp(:,:,k,l) = tktrop(l)
       endwhere
@@ -660,14 +703,14 @@ do k=1,size(t,3)
         tkhi_decomp(:,:,l) = tkstrat(l)
       else
         tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkstrat(l) + (tkmeso(l) - tkstrat(l))*(z_full - z_trop - z_kdepth)/(50 - z_trop - z_kdepth))
+          tkstrat(l) + (tkmeso(l) - tkstrat(l))*(z_full - z_vortex - z_kdepth)/(50 - z_vortex - z_kdepth))
       endif
-      where (s > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(s - sigma_b)/(1.0 - sigma_b)
-      elsewhere (z_full < z_trop) ! below tropopause, not some fixed height
+      where (sigma(:,:,k) > sigma_b)
+        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
+      elsewhere (z_full < z_vortex) ! below tropopause, not some fixed height
         tdamp(:,:,k,l) = tktrop(l)
-      elsewhere (z_full >= z_trop .and. z_full < z_trop + z_kdepth)
-        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l) - tkstrat(l))*(z_full - z_trop)/z_kdepth
+      elsewhere (z_full >= z_vortex .and. z_full < z_vortex + z_kdepth)
+        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l) - tkstrat(l))*(z_full - z_vortex)/z_kdepth
       elsewhere
         tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
       endwhere
@@ -683,12 +726,11 @@ do k=1,size(t,3)
       ! Damp the *full* temperature, then exit
       ! NOTE: Damping resides in the 'mean' slot, even though it is the full
       ! damping! We just do this to avoid decomposition (and save a bit of time)
-      ! unless it's really necessary.
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t(:,:,k) - teq(:,:,k))
       tdamp(:,:,k,2) = tdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
     else if (l==1) then
-      ! Damp the mean (first dimension is longitudes)
+      ! Damp the mean
       t_bar = sum(t(:,:,k), 1)/size(t, 1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_bar
@@ -702,30 +744,6 @@ do k=1,size(t,3)
   enddo
 enddo
 
-! Uncomment for forcing sanity check
-! call get_time(Time,seconds,days)
-! time2 = float(days) + float(seconds)/seconds_per_day
-! if (mod(time2,3.) == 0. .and. mpp_pe() == 6) then
-!   write(*,*) 1./tdamp(1,1,:)/seconds_per_day
-!   write(*,*) ' '
-!   write(*,*) p_full(1,1,:)
-!   write(*,*) ' '
-!   write(*,*) ps(1,1)
-!   call error_mesg ('forcing','tdamp test', FATAL)
-! endif
-
-! "If the following loop uses vector notation for all indices
-!  then the code will not run ??????"
-!     Think this person ^^^ was crazy, seems to work fine
-!     why on earth would that be the case ???
-!     anyway don't need to reinvent the wheel, will just keep everything
-!     in the loop above
-! do k=1,size(t,3)
-!   tdt(:,:,k) = -tdamp(:,:,k)*(t(:,:,k)-teq(:,:,k))
-! enddo
-! tdt = -tdamp*(t-teq)
-
-!     ----- Mask -----
 if (present(mask)) then
   teq = teq * mask
   do l=1,2
@@ -774,7 +792,7 @@ subroutine tstd_summer ( t_tp, z_off, z_full, teq )
 
 end subroutine tstd_summer
 
-subroutine tstd_winter ( t_tp, vtx_gamma, z_trop, z_full, teq )
+subroutine tstd_winter ( t_tp, vtx_gamma, z_vortex, z_full, teq )
 
   !----------------------------------------------------------------------------!
   ! Polar vortex adaptation
@@ -783,14 +801,14 @@ subroutine tstd_winter ( t_tp, vtx_gamma, z_trop, z_full, teq )
   !----------------------------------------------------------------------------!
 
   real, intent(in)                  :: t_tp, vtx_gamma
-  real, intent(in), dimension(:,:)  :: z_full, z_trop
+  real, intent(in), dimension(:,:)  :: z_full, z_vortex
   real, intent(out), dimension(:,:) :: teq
 
   ! New version with simple vortex lapse rate
-  where (z_full <= z_trop)
+  where (z_full <= z_vortex)
     teq = t_tp
   elsewhere
-    teq = t_tp - vtx_gamma*(z_full - z_trop)
+    teq = t_tp - vtx_gamma*(z_full - z_vortex)
   endwhere
 
   ! Previous version with calculation done in pressure coords
@@ -804,7 +822,7 @@ subroutine tstd_winter ( t_tp, vtx_gamma, z_trop, z_full, teq )
   ! end if
   ! t_1 = t_min - vtx_gamma*(32 - z_tp_ref)
   ! z_vtx_recover = z_offset + (t_sp - t_1)/2.8
-  ! where (z_coord <= z_trop)
+  ! where (z_coord <= z_vortex)
   !   teq = t_min
   ! elsewhere (z_coord <= 32 + z_offset) ! lapse rate 1K for 12km
   !   teq = t_min - vtx_gamma*(z_coord - (z_tp_ref + z_offset))
@@ -820,128 +838,101 @@ subroutine tstd_winter ( t_tp, vtx_gamma, z_trop, z_full, teq )
 
 end subroutine tstd_winter
 
-subroutine load_heating ( tdt )
-
-  !-----------------------------------------------------------------------
-  !
-  !           Impose forcing loaded from file
-  !
-  !-----------------------------------------------------------------------
-  real, intent(inout), dimension(:,:,:)    :: tdt
-  real, dimension(size(tdt,2),size(tdt,3)) :: tdt_mean
-
-end subroutine
-
-subroutine extra_heating ( lat, ps, p_full, t, tdt, mask )
+subroutine butler_heating ( x, y, tdt )
 
   !-----------------------------------------------------------------------
   !
   !           Impose Butler et al. and other forcing perturbations
+  !           Input is 'x' (latitude in radians) and 'y' (sigma level)
   !
   !-----------------------------------------------------------------------
-  real, intent(in),    dimension(:,:)   :: lat, ps
-  real, intent(in),    dimension(:,:,:) :: t, p_full
+  real, intent(in),    dimension(:,:)   :: x
+  real, intent(in),    dimension(:,:,:) :: y
   real, intent(inout), dimension(:,:,:) :: tdt
-  real, intent(in),    dimension(:,:,:), optional :: mask
   !-----------------------------------------------------------------------
   integer :: k
-  real, dimension(size(t,1),size(t,2)) :: ps_inv
-  real, dimension(size(t,1),size(t,2),size(t,3)) :: x, y
 
-  ps_inv = 1.0/ps
+  do k = 1, size(tdt,3)
+    !     ----- Tropical forcing, mimics lapse rate feedback -----
+    if (q0_tropical .ne. 0) then
+      tdt(:,:,k) = tdt(:,:,k) + q0_tropical*exp( &
+          -((x(:,:)   - x0_tropical)**2/(2*sx_tropical**2) + &
+            (y(:,:,k) - y0_tropical)**2/(2*sy_tropical**2)) &
+            ) / seconds_per_day
+    endif
 
-  !     ----- Tropical forcing, mimics lapse rate feedback -----
-  if (q0_tropical .ne. 0) then
-    do k = 1, size(t,3)
-      x(:,:,k) = lat ! already in radians
-      y(:,:,k) = p_full(:,:,k)*ps_inv
-    enddo
-    tdt = tdt + q0_tropical*exp( &
-        -((x - x0_tropical)**2/(2*sx_tropical**2) + &
-          (y - y0_tropical)**2/(2*sy_tropical**2)) &
-          ) / seconds_per_day
-  endif
+    !     ----- Polar vortex forcing, mimics ozone depletion -----
+    if (q0_vortex .ne. 0) then
+      tdt(:,:,k) = tdt(:,:,k) + q0_vortex*exp( &
+        -2*((x(:,:)   - x0_vortex)**2/(2*sx_vortex**2) + &
+            (y(:,:,k) - y0_vortex)**2/(2*sy_vortex**2)) &
+            ) / seconds_per_day
+    endif
 
-  !     ----- Polar vortex forcing, mimics ozone depletion -----
-  if (q0_vortex .ne. 0) then
-    do k = 1, size(t,3)
-      x(:,:,k) = lat ! already in radians
-      y(:,:,k) = p_full(:,:,k)*ps_inv
-    enddo
-    tdt = tdt + q0_vortex*exp( &
-      -2*((x - x0_vortex)**2/(2*sx_vortex**2) + &
-          (y - y0_vortex)**2/(2*sy_vortex**2)) &
-          ) / seconds_per_day
-  endif
+    !     ----- Arctic forcing, mimics Arctic amplification -----
+    ! Verify this works!
+    if (q0_arctic .ne. 0) then
+      where (x .gt. 0)
+        tdt(:,:,k) = tdt(:,:,k) + q0_arctic &
+              * cos(x - x0_arctic)**15 * exp(6*(y(:,:,k) - y0_arctic)) &
+              / seconds_per_day
+      endwhere
+    endif
+  enddo
 
-  !     ----- Arctic forcing, mimics Arctic amplification -----
-  ! TODO: Verify this works!
-  if (q0_arctic .ne. 0) then
-    do k = 1, size(t,3)
-      x(:,:,k) = lat ! already in radians
-      y(:,:,k) = p_full(:,:,k)*ps_inv
-    enddo
-    where (x .gt. 0)
-      tdt = tdt + q0_arctic &
-            * cos(x - x0_arctic)**15 * exp(6*(y - y0_arctic)) &
-            / seconds_per_day
-    endwhere
-  endif
+end subroutine butler_heating
 
-  !     ----- Surface forcing -----
-  ! This reaches maximum strength at surface, decays to zero at the boundary
-  ! layer boundary. Note this is meridionally constant.
-  if (q0_surface .ne. 0) then
-    do k = 1, size(t,3)
-      y(:,:,k) = p_full(:,:,k)*ps_inv
-    enddo
-    where (y .gt. sigma_b)
-      tdt = tdt + q0_surface * ((y - sigma_b) / (1 - sigma_b)) &
-            / seconds_per_day
-    endwhere
-  endif
+subroutine lsp_heating ( lon, lat, p_full, tdt )
+  !-----------------------------------------------------------------------
+  !
+  !           Impose Lindgren,Sheshadri,Plumb 2018 localised heating
+  !           perturbation to excite planetary waves
+  !           DOI: 10.1029/2018JD028537
+  !
+  !-----------------------------------------------------------------------
+  real, intent(in),    dimension(:,:)   :: lon, lat
+  real, intent(in),    dimension(:,:,:) :: p_full
+  real, intent(inout), dimension(:,:,:) :: tdt
+  real :: pbot, ptop, phi0_lsp, sphi_lsp
+  !-----------------------------------------------------------------------
+  ! Note model longitudes and latitudes are in radians!
+  integer :: k
 
-  !     ----- Globally constant forcing -----
-  if (q0_global .ne. 0) then
-    tdt = tdt + q0_global / seconds_per_day
-  endif
+  phi0_lsp = lat0_lsp * pi/180.0 ! latitude at which localised heating is centred
+  sphi_lsp = slat_lsp * pi/180.0 ! 0.175 radians default, presumably related to the width of heating in latitude (standard deviation in Gaussian distribution)
+  pbot = p0_lsp*100.0
+  ptop = pt_lsp*100.0
+  do k=1,size(tdt,3)
+    where ((p_full(:,:,k) <= pbot) .and. (p_full(:,:,k) >= ptop))
+      tdt(:,:,k) = tdt(:,:,k) + q0_lsp * sin(m_lsp*lon(:,:))*exp(-0.5*((lat - phi0_lsp)/sphi_lsp)**2)*sin(pi*log(p_full(:,:,k)/pbot)/log(ptop/pbot))
+    endwhere 
+  enddo
 
-  !     ----- Mask -----
-  if (present(mask)) then
-    tdt = tdt * mask
-  endif
+end subroutine
 
-end subroutine extra_heating
-
-subroutine friction_damping ( ps, p_full, u, v, udt, vdt, rdamp, mask )
+subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
 
   !-----------------------------------------------------------------------
   !
   !           Rayleigh damping of wind components near surface
   !
   !-----------------------------------------------------------------------
-
-  real, intent(in),  dimension(:,:)   :: ps
-  real, intent(in),  dimension(:,:,:) :: p_full, u, v
+  real, intent(in),  dimension(:,:,:) :: sigma, u, v
   real, intent(in),  dimension(:,:,:), optional :: mask
   real, intent(out), dimension(:,:,:,:) :: udt, vdt, rdamp
-
+  !-----------------------------------------------------------------------
+  real, dimension(size(u,2)) :: u_mean, v_mean
+  real, dimension(size(u,1),size(u,2),2) :: u_decomp, v_decomp
+  integer :: i, j, k, l
   !-----------------------------------------------------------------------
 
-  real, dimension(size(u,1),size(u,2)) :: s, ps_inv
-  real, dimension(size(u,1),size(u,2),2) :: u_decomp, v_decomp
-  real, dimension(size(u,2)) :: u_mean, v_mean
-  integer :: i, j, k, l
-
-  ps_inv  = 1./ps
   do k=1,size(u,3)
-    s = p_full(:,:,k)*ps_inv
     do l=1,2
       !    ---- Determine damping coeffs ----
-      where (s <= 1.0 .and. s > sigma_b)
-        rdamp(:,:,k,l) = vkfric(l)*(s-sigma_b)/(1.0-sigma_b)
+      where (sigma(:,:,k) <= 1.0 .and. sigma(:,:,k) > sigma_b)
+        rdamp(:,:,k,l) = vkfric(l)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
       elsewhere
-        rdamp(:,:,k,l) = 0.0*s
+        rdamp(:,:,k,l) = 0.0
       endwhere
 
       !    ---- Apply damping ----
@@ -983,39 +974,34 @@ subroutine friction_damping ( ps, p_full, u, v, udt, vdt, rdamp, mask )
 
 end subroutine friction_damping
 
-subroutine sponge_damping ( ps, p_full, u, v, uspg, vspg, mask )
+subroutine sponge_damping ( p_full, u, v, uspg, vspg, mask )
 
   !-----------------------------------------------------------------------
   !
   !     Damp upper stratospheric winds with sponge
   !
   !-----------------------------------------------------------------------
-  real, intent(in),  dimension(:,:  ) :: ps
   real, intent(in),  dimension(:,:,:) :: p_full, u, v
   real, intent(out), dimension(:,:,:) :: uspg, vspg
   real, intent(in),  dimension(:,:,:), optional :: mask
   !-----------------------------------------------------------------------
-  real, dimension(size(u,1),size(u,2)) :: sp_fact, spcoeff, ksp, s, ps_inv
+  real, dimension(size(u,1),size(u,2)) :: sp_fact, spcoeff, ksp
   real    :: p_sp
   integer :: i, j, k
   !-----------------------------------------------------------------------
 
-  ps_inv = 1./ps
-  p_sp   = p_sponge * 100.
+  p_sp   = p_sponge * 100.0
   ksp    = -vksponge(1) ! for time being, no option to separate mean/anomaly sponge damping
 
   do k = 1, size(u,3)
-    s = p_full(:,:,k)*ps_inv
-    ! where (s < p_sponge)
     where (p_full(:,:,k) .lt. p_sp)
-      ! sp_fact = (p_sponge-s)/p_sponge
-      sp_fact = (p_sp-p_full(:,:,k))/p_sp
+      sp_fact = (p_sp - p_full(:,:,k))/p_sp
       spcoeff = ksp*sp_fact*sp_fact
       uspg(:,:,k)  = spcoeff*u(:,:,k) 
       vspg(:,:,k)  = spcoeff*v(:,:,k)
     elsewhere
-      uspg(:,:,k)  = 0.
-      vspg(:,:,k)  = 0.
+      uspg(:,:,k)  = 0.0
+      vspg(:,:,k)  = 0.0
     endwhere
   enddo
 

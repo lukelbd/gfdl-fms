@@ -1,6 +1,6 @@
 #!/bin/bash
 ################################################################################
-# Script for compiling fortran source code on various machines.
+# Script for compiling fortran source code on various machines
 ################################################################################
 # Raise error
 raise() {

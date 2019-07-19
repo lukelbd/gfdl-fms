@@ -3,6 +3,7 @@
 # atmos_fv_dynamics had strange compilation bug, need to figure out eventually
 ./postprocessing/mppnccombine.c
 ./src/atmos_param/forcing/forcing.orig.f90
+./src/atmos_param/forcing/forcing.lina.f90
 ./src/atmos_param/shallow_physics/shallow_physics.f90
 ./src/atmos_spectral/driver/solo/atmosphere.surf0.f90
 ./src/atmos_spectral/driver/solo/atmosphere.surf1.f90

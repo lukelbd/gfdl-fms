@@ -26,8 +26,7 @@ module topography_mod
 !   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <LINK SRC="gaussian_topog.html">gaussian_topog_mod</LINK>.
 ! </DESCRIPTION>
 
-use gaussian_topog_mod, only: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_sinusoidal_topog
-!use sinusoidal_topog_mod, only: sinusoidal_topog_init, get_sinusoidal_topog
+use gaussian_topog_mod, only: gaussian_topog_init, get_gaussian_topog
 use   horiz_interp_mod, only: horiz_interp
 
 use            fms_mod, only: file_exist, check_nml_error,               &
@@ -43,8 +42,7 @@ public :: topography_init,                 &
           get_topog_mean, get_topog_stdev, &
           get_ocean_frac, get_ocean_mask,  &
           get_water_frac, get_water_mask,  &
-          gaussian_topog_init, get_gaussian_topog, &
-          sinusoidal_topog_init, get_sinusoidal_topog
+          gaussian_topog_init, get_gaussian_topog
 
 !-----------------------------------------------------------------------
 ! <NAMELIST NAME="topography_nml">

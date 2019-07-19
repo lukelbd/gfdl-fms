@@ -129,6 +129,6 @@
 ./src/shared/time_interp/time_interp.f90
 ./src/shared/time_manager/get_cal_time.f90
 ./src/shared/time_manager/time_manager.F90
-./src/shared/topography/gaussian_topog.f90
+./src/shared/topography/idealized_topog.f90
 ./src/shared/topography/topography.f90
 ./src/shared/tracer_manager/tracer_manager.F90

@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 # This can be used to rename modules that appear throughout the code
 # cat "$f" | grep "$pattern"
-dryrun=false
+dryrun=true
 pattern="$1"
 replace="$2"
 path=${0%/*}

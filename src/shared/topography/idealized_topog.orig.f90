@@ -1,5 +1,5 @@
 
-module gaussian_topog_mod
+module idealized_topog_mod
 
 ! <CONTACT EMAIL="Bruce.Wyman@noaa.gov">
 !   Bruce Wyman
@@ -268,7 +268,7 @@ end subroutine read_namelist
 
 !#######################################################################
 
-end module gaussian_topog_mod
+end module idealized_topog_mod
 
 ! <INFO>
 !   <NOTE>

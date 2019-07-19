@@ -23,10 +23,10 @@ module topography_mod
 !   The interpolation scheme conserves the area-weighted average
 !   of the input data by using module horiz_interp.
 !
-!   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <LINK SRC="gaussian_topog.html">gaussian_topog_mod</LINK>.
+!   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <LINK SRC="gaussian_topog.html">idealized_topog_mod</LINK>.
 ! </DESCRIPTION>
 
-use gaussian_topog_mod, only: gaussian_topog_init, get_gaussian_topog
+use idealized_topog_mod, only: gaussian_topog_init, get_gaussian_topog
 use   horiz_interp_mod, only: horiz_interp
 
 use            fms_mod, only: file_exist, check_nml_error,               &
@@ -712,7 +712,7 @@ end module topography_mod
 !    z = z*100. ! in percent
 !    call printz ('get_ocean_frac')
 !  
-!  ! test gaussian_topog_mod routines
+!  ! test idealized_topog_mod routines
 !    a = .true.
 !    z = get_gaussian_topog(x,y,ht,x0,y0,xw,yw,xr,yr)
 !    call printz ('get_gaussian_topog')

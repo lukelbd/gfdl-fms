@@ -3,7 +3,7 @@ module bgrid_cold_start_mod
 
 use    bgrid_horiz_mod, only: horiz_grid_type, get_horiz_grid_bound, TGRID
 use     bgrid_halo_mod, only: update_halo, TEMP
-use gaussian_topog_mod, only: gaussian_topog_init
+use idealized_topog_mod, only: gaussian_topog_init
 use            fms_mod, only: file_exist, open_namelist_file, open_restart_file, &
                               open_ieee32_file, check_nml_error, close_file,     &
                               mpp_pe, mpp_root_pe, set_domain, read_data,        &

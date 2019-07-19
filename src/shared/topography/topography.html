@@ -58,7 +58,7 @@
    of the input data by using module horiz_interp.
    <br>
 <br>
-   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <a href="gaussian_topog.html">gaussian_topog_mod</a>. </div>
+   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <a href="gaussian_topog.html">idealized_topog_mod</a>. </div>
 <br>
 <!-- END DESCRIPTION -->
 <a name="OTHER MODULES USED"></a>
@@ -66,7 +66,7 @@
 <h4>OTHER MODULES USED</h4>
 <!-- BEGIN OTHER MODULES USED -->
 <div>
-<pre>gaussian_topog_mod<br>  horiz_interp_mod<br>           fms_mod<br>        fms_io_mod</pre>
+<pre>idealized_topog_mod<br>  horiz_interp_mod<br>           fms_mod<br>        fms_io_mod</pre>
 </div>
 <!-- END OTHER MODULES USED -->
 <!-- BEGIN PUBLIC INTERFACE -->
@@ -581,7 +581,7 @@
     z = z*100. ! in percent
     call printz ('get_ocean_frac')
   
- test gaussian_topog_mod routines
+ test idealized_topog_mod routines
     a = .true.
     z = get_gaussian_topog(x,y,ht,x0,y0,xw,yw,xr,yr)
     call printz ('get_gaussian_topog')

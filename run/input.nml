@@ -98,3 +98,20 @@
   q0_lsp          = 0.0,        ! intensity of lsp forcing
 /
 
+! Topography namelist
+! Change these values to impose idealized Gaussian or sinusoidal topography
+&idealized_topog_nml
+  height     = 0.0,     ! height of the Gaussian mountain
+  olon       = 0.0,     ! central coordinates
+  olat       = 0.0,
+  rlon       = 0.0,     ! half-width of ridge
+  rlat       = 0.0,
+  wlon       = 0.0,     ! half-width of tail
+  wlat       = 0.0,
+  m          = 1,       ! wavenumber of the sine wave
+  Amp2       = 0,       ! should be 0 or 1; if 1, wavenumber 2 mountain is added to wavenumber 1
+  height_sin = 0.0,     ! sinusoidal mountain height (meters)
+  uneven_sin = .false., ! toggle uneven sinusoidal mountain
+  uneven_fac = 1.0,     ! second mountain is this much taller than first mountain
+  deltalat   = 0.0,     ! moves mountain meridionally from the default position
+/

@@ -97,3 +97,4 @@
   q0_surface      = 0.0,        ! average strength of boundary layer heating, that decays linearly from surface to top of boundary layer
   q0_lsp          = 0.0,        ! intensity of lsp forcing
 /
+

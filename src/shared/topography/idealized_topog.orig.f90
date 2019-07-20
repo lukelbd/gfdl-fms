@@ -33,7 +33,7 @@ private
 public :: gaussian_topog_init, get_gaussian_topog
 
 !-----------------------------------------------------------------------
-! <NAMELIST NAME="gaussian_topog_nml">
+! <NAMELIST NAME="idealized_topog_nml">
 !   <DATA NAME="height" UNITS="meter" TYPE="real" DIM="(mxmtns)" DEFAULT="0.">
 !     Height in meters of the Gaussian mountains.
 !    </DATA>
@@ -66,7 +66,7 @@ public :: gaussian_topog_init, get_gaussian_topog
    real, dimension(maxmts) ::  rlon  = 0.
    real, dimension(maxmts) ::  rlat  = 0.
 
-   namelist /gaussian_topog_nml/ height, olon, olat, wlon, wlat, rlon, rlat
+   namelist /idealized_topog_nml/ height, olon, olat, wlon, wlat, rlon, rlat
 ! </NAMELIST>
 
 !-----------------------------------------------------------------------
@@ -93,7 +93,7 @@ contains
 !     Returns a land surface topography that consists of a "set" of
 !     simple Gaussian-shaped mountains.  The height, position,
 !     width, and elongation of the mountains can be controlled
-!     by variables in namelist <LINK SRC="#NAMELIST">&#38;gaussian_topog_nml</LINK>.
+!     by variables in namelist <LINK SRC="#NAMELIST">&#38;idealized_topog_nml</LINK>.
 !   </DESCRIPTION>
 !   <TEMPLATE>
 !     <B>call gaussian_topog_init</B> ( lon, lat, zsurf )
@@ -249,8 +249,8 @@ subroutine read_namelist
    if ( file_exist('input.nml')) then
       unit = open_namelist_file ( )
       ierr=1; do while (ierr /= 0)
-         read  (unit, nml=gaussian_topog_nml, iostat=io, end=10)
-         ierr = check_nml_error(io,'gaussian_topog_nml')
+         read  (unit, nml=idealized_topog_nml, iostat=io, end=10)
+         ierr = check_nml_error(io,'idealized_topog_nml')
       enddo
  10   call close_file (unit)
    endif
@@ -259,7 +259,7 @@ subroutine read_namelist
 
    if (mpp_pe() == mpp_root_pe()) then
       unit = stdlog()
-      write (unit, nml=gaussian_topog_nml)
+      write (unit, nml=idealized_topog_nml)
    endif
 
    do_nml = .false.

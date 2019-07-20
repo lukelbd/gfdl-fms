@@ -119,16 +119,16 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
                          rdt, mask, kbot )
 
   !-----------------------------------------------------------------------
-  type(time_type), intent(in)                        :: Time
-  integer, intent(in)                                :: is, ie, js, je
-  real, intent(in)                                   :: dt
-  real, intent(in),    dimension(:,:)                :: lat
-  real, intent(in),    dimension(:,:,:)              :: p_half, p_full
-  real, intent(in),    dimension(:,:,:)              :: u, v, t, um, vm, tm
-  real, intent(in),    dimension(:,:,:,:)            :: r, rm
-  real, intent(inout), dimension(:,:,:)              :: udt, vdt, tdt
-  real, intent(inout), dimension(:,:,:,:)            :: rdt
-  real, intent(in),    dimension(:,:,:), optional    :: mask
+  type(time_type), intent(in)                      :: Time
+  integer, intent(in)                              :: is, ie, js, je
+  real, intent(in)                                 :: dt
+  real, intent(in),    dimension(:,:)              :: lat
+  real, intent(in),    dimension(:,:,:)            :: p_half, p_full
+  real, intent(in),    dimension(:,:,:)            :: u, v, t, um, vm, tm
+  real, intent(in),    dimension(:,:,:,:)          :: r, rm
+  real, intent(inout), dimension(:,:,:)            :: udt, vdt, tdt
+  real, intent(inout), dimension(:,:,:,:)          :: rdt
+  real, intent(in),    dimension(:,:,:), optional  :: mask
   integer, intent(in),    dimension(:,:), optional :: kbot
   !-----------------------------------------------------------------------
   real, dimension(size(t,1),size(t,2))             :: ps, diss_heat
@@ -170,16 +170,15 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
 
   !     Rayleigh damping of wind components near the surface
   !     Sponge layer damping of wind components at the top
-
   udt_damp = 0.0
   vdt_damp = 0.0
-  call friction_damping ( sigma, u, v, udt_damp, vdt_damp, rdamp, mask )
+  call friction_damping ( sigma, u, v, udt_damp, vdt_damp, rdamp, mask=mask )
 
   udt_sponge = 0.0
   vdt_sponge = 0.0
   if (strat_sponge) then
     ! Apply sponge damping
-    call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, mask )
+    call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, mask=mask )
     ! Diagnostic output
     if (id_uvdt_sponge > 0) used = send_data(id_uvdt_sponge, sqrt(udt_sponge**2 + vdt_sponge**2), Time, is, js)
     if (id_udt_sponge  > 0) used = send_data(id_udt_sponge, udt_sponge, Time, is, js)
@@ -188,18 +187,16 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
-
   tdt_damp = 0.0
   if (input_damping) then
-    call load_damping ( tdt_damp, mask )
+    call load_damping ( tdt_damp, mask=mask )
   else
-    call thermal_damping ( lat, sigma, p_full, t, tdt_damp, tdamp, teq, mask )
+    call thermal_damping ( lat, sigma, p_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
 
   !     Butler et al. (2010) radiative forcing and other forcing
   !     Lindgren et al. (2018) wave heating
   !     Dissipative heating to conserve energy
-
   tdt_force = 0.0
   if ((q0_arctic .ne. 0) .or. (q0_tropical .ne. 0) .or. (q0_vortex .ne. 0)) then
     call butler_heating ( lat, sigma, tdt_force )
@@ -215,7 +212,9 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
       tdt_force = tdt_force + q0_surface * ((sigma - sigma_b) / (1 - sigma_b)) / seconds_per_day
     endwhere
   endif
-  tdt_force = mask * tdt_force
+  if (present(mask)) then
+    tdt_force = mask * tdt_force
+  endif
 
   tdt_diss = 0.0
   if (conserve_energy) then
@@ -235,7 +234,6 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   endif
 
   !     Apply forced wind and temperature tendencies, send data
-
   udt = udt + udt_damp(:,:,:,1) + udt_damp(:,:,:,2) + udt_sponge
   vdt = vdt + vdt_damp(:,:,:,1) + vdt_damp(:,:,:,2) + vdt_sponge
 
@@ -264,7 +262,6 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   if (id_ndamp_anom > 0) used = send_data(id_ndamp_anom, tdamp(:,:,:,2),    Time, is, js)
 
   !     Tracers
-
   call get_number_tracers(MODEL_ATMOS, num_tracers=num_tracers)
   if (num_tracers == size(rdt,4)) then
     do n = 1, size(rdt,4)

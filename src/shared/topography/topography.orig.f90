@@ -659,7 +659,7 @@ end module topography_mod
 !  To run this program you will need the topography and percent water
 !  data sets and use the following namelist (in file input.nml).
 !  
-!   &amp;gaussian_topog_nml
+!   &amp;idealized_topog_nml
 !     height = 5000., 3000., 3000., 3000.,
 !     olon   =   90.,  255.,  285.,    0.,
 !     olat   =   45.,   45.,  -15.,  -90.,

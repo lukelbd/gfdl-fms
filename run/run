@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-usage='drycore_run [-hnrsif] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] DIR'
+usage='run [-hnrsif] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] MODEL DIR'
 doc="This script runs the GFDL dry core model in blocks of N days, and processes
 the parallel output NetCDF files with './process' before merging them. This means
 pressure level interpolation, heat flux calcualtion, etc. are done in parallel
@@ -41,20 +41,12 @@ Optional arguments
   [-tsp|--tspindown]=*      Comma-separated list of initial spindown days.
 "
 # Initial stuff
-source ${0%/*}/header.sh
+sdir=$(readlink -f ${0})
+sdir=${sdir%/*}
+source $sdir/header.sh
 shopt -u nullglob
 ulimit -s unlimited
 export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
-cwd=${0%/*}
-
-# Executables
-# export MPI_SHEPHERD=true # see: https://www2.cisl.ucar.edu/sites/default/files/intro_to_hpc.pdf
-# when mpiexec_mpt used, MPI_SHEPHERD required, but this failed for me
-run=mpirun # for running in parallel
-fms=$HOME/gfdl-drycore/run/fms.x
-pinline=$cwd/process_inline
-pforcing=$cwd/process_forcing
-which $run &>/dev/null || raise "$run not found in \$PATH."
 
 # Parse input flags
 # Read the comments to see explanations for each option
@@ -68,34 +60,59 @@ tend=0
 tstart=0 # defaults
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
+    # Flags
     -h|--help) echo "$doc" && exit 0 ;;
-    -n|--new)  new=true ;; # use this to *exit* if experiment folder already exists
-    -f|--fix)  fix=true ;;
+    -n|--new) new=true ;; # use this to *exit* if experiment folder already exists
+    -f|--fix) fix=true ;;
     -i|--init) init=true ;; # *only* save forcing scheme data to file?
     -r|--resume) resume=true ;; # use this to *autodetect* last day of existing run, continue from there
-    -m=*|--mode=*)  mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
+    -m=*|--mode=*) mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
     -c=*|--cores=*) cores=${1#*=} ;;
-    -p=*|--process=*) process=${1#*=} ;; # name of the process script
+    -p=*|--process=*) pinline=${1#*=} ;; # name of the process script
     -pf=*|--process-forcing=*) pforcing=${1#*=} ;; # name of the process script
     -rd=*|--restart=*) rinit=${1#*=} ;; # manual override restart directory
     -ts=*|--tstart=*) tstart=${1#*=} ;; # use this to continue from *particular* day of existing run
     -te=*|--tend=*) tend=${1#*=} ;; # ending day
-    -tsp=*|--tspindown=*) tspindown=($(echo ${1#*=} | tr ',' ' ')) ;;
     -kts=*|--ktstart=*) ktstart=${1#*=} ;;
     -kte=*|--ktend=*) ktend=${1#*=} ;;
-    -*) pflags+="$1 " ;; # send all extra flags to process function
-    *) [ -n "$expdir" ] && raise "More than one experiment directory specified."
-       expdir="$1" ;;
+    -tsp=*|--tspindown=*) tspindown=($(echo ${1#*=} | tr ',' ' ')) ;;
+    -*) gpflags+="$1 " ;; # send all extra flags to process function
+    # Positional args
+    *)
+    if [ -z "$model" ]; then
+      model="$1"
+    elif [ -z "$expdir" ]; then
+      expdir="$1"
+    else
+      raise "This script requires exactly two positional arguments."
+    fi ;;
   esac
   shift
 done
+[ -n "$gpflags" ] && echo "Passing these flags to processing script: $gpflags"
+# Executables
+# export MPI_SHEPHERD=true # see: https://www2.cisl.ucar.edu/sites/default/files/intro_to_hpc.pdf
+# when mpiexec_mpt used, MPI_SHEPHERD required, but this failed for me
+run=mpirun # for running in parallel
+model=$sdir/${model}.x
+which $run &>/dev/null || raise "$run not found in \$PATH."
 # Errors and messages
-[ -z $expdir ]  && raise "You must declare the experiment directory."
-[ -x $fms ]     || raise "The executable $fms is missing."
-[ -x $pinline ] || raise "The bash script for processing data is missing."
 ! $init && [ $tend -eq 0 ] && raise "You must pass an end time"
+[ -z "$model" ] && raise "You must declare the model name."
+[ -z "$expdir" ] && raise "You must declare the experiment directory."
+[ -x "$model" ] || raise "The executable $model is missing."
+# Check user scripts
+which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
+[ -z "$pinline" ] && pinline=$sdir/process
+[ -x "$pinline" ] || raise "Processing script $pinline not found or is not executable."
+pinline=$(realpath $pinline)
+if [ -n "$pforcing" ]; then
+  [ -x "$pforcing" ] || raise "Forcing processing script $pforcing not found or is not executable."
+  pforcing=$(realpath $pforcing)
+fi
+# Restart directory
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
-  rinit=($rinit/d*-d*);
+  rinit=($rinit/d*-d*)
   rinit="${rinit[-1]}"
   echo "Using final block from ${rinit##*/} for restart files."
 fi
@@ -188,7 +205,7 @@ dir_setup() {
   mkdir $wdir
   [ $? -ne 0 ] && raise "Failed to create working directory \"$wdir\"." && return 1
   cd $wdir
-  cp $fms ./fms.x # move executable inside (declared at top of file)
+  cp $model . # move executable inside (declared at top of file)
   mkdir RESTART # model spits out stuff here, can be accepted as input to new iteration
   mkdir INPUT   # model reads from this
   touch field_table # just put empty file, if want no tracers
@@ -196,13 +213,13 @@ dir_setup() {
   # Copy existing namelist file over
   # For shutdown experiments, can edit on the fly to turn off
   # radiation, et cetera, but this is starting point
-  [ -r $expdir/input.nml ] || raise "input.nml file not found."
-  [ -r $expdir/diag_table ] || raise "diag_table file not found."
-  [ -r $expdir/field_table ] || raise "field_table file not found."
+  [ -r $expdir/input.nml ] || raise "$expdir/input.nml file not found."
+  [ -r $expdir/diag_table ] || raise "$expdir/diag_table file not found."
+  [ -r $expdir/field_table ] || raise "$expdir/field_table file not found."
   cp $expdir/input.nml ./
   cp $expdir/diag_table ./
   cp $expdir/field_table ./
-  topo=$(nml_parse $nml topography_option) # use helper function
+  topo=$(nml_parse input.nml topography_option) # use helper function
   if [ "$topo" == "input" ]; then
     [ -r $expdir/topography.data.nc ] || raise "Topography file not available."
     cp $expdir/topography.data.nc INPUT/
@@ -211,10 +228,10 @@ dir_setup() {
   # Namelist changes for spindown runs
   if [ $mode -gt 0 ]; then
     case $mode in   # determine spindown type
-      1) nml_replace $nml ktrop 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all thermal damping
-      2) nml_replace $nml ktrop 0 kstrat 0 kmeso 0 ;; # turn off damping except in boundary layer
-      3) nml_replace $nml ktrop 0 kfric 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all damping
-      4) nml_replace $nml kfric 0 ;; # turn off friction
+      1) nml_replace input.nml ktrop 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all thermal damping
+      2) nml_replace input.nml ktrop 0 kstrat 0 kmeso 0 ;; # turn off damping except in boundary layer
+      3) nml_replace input.nml ktrop 0 kfric 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all damping
+      4) nml_replace input.nml kfric 0 ;; # turn off friction
       *) raise "Unknown experiment identifier \"$mode\"." ;;
     esac
     nml_print
@@ -243,14 +260,14 @@ exit_check() {
 }
 run_model() {
   # Run model in parallel
-  usage="run_model PROCESS_SCRIPT CURRENT_DAY NCORES"
   local usage cday ncores process
+  usage="run_model CURRENT_DAY NCORES PROCESS_SCRIPT"
   cday=$1 # current day
   ncores=$2 # number of processors
   process=$3
   t1=$(date +%s)
   echo "Running model..."
-  $run -np $ncores ./fms.x &>model.log # need ./fms.x, not fms
+  $run -np $ncores ./${model##*/} &>model.log
   grep -E 'EXIT CODE: [1-9]|FATAL from PE|WARNING from PE' model.log &>/dev/null && \
     raise "Bad exit code from model run step."
   tmodel=$(cat model.log | grep "Total runtime*" | xargs | cut -d " " -f 5)
@@ -259,13 +276,13 @@ run_model() {
   # Remove some files
   [ -d INPUT ] && [ $cday -gt 0 ] && rm -rf INPUT # remove input *if* this is not start of new run; in that case we want to keep input so know what's going on
   [ -r logfile.0000.out ] && mv logfile.0000.out init.log # contains init info
-  rm fms.x # remove executable, because takes up space
+  rm ${model##*/} # remove executable, because takes up space
 
   # Process new data, and remove old data
   # Previously we set processor affinities, but didn't help much
   if [ -n "$process" ]; then
-    echo "Calling processing script with flags: $(echo $ipflags $pflags | xargs)"
-    $process $ipflags $pflags &>log.process
+    echo "Calling processing script with flags: $(echo $pflags $gpflags | xargs)"
+    $process $pflags $gpflags &>log.process
     exit_check $?
     tprocess=$(tail -1 log.process | sed 's/[^0-9]*//g')
     echo "Process time: ${tprocess%.*}s."
@@ -276,8 +293,31 @@ run_model() {
 # Run model for a second to get the *unchanging* forcing params, i.e. teq,
 # kdamp, kfric, and ksponge.
 ################################################################################
-[ -r $expdir/input.nml ] || raise "input.nml file not found."
+[ -r $expdir/input.nml ] || raise "$expdir/input.nml not found."
+[ -d $expdir/forcing ] || mkdir $expdir/forcing
+# Set up directory
 dir_setup 0 $expdir/forcing
+nml_replace $expdir/forcing/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
+cat >$expdir/forcing/diag_table <<EOF
+"Forcing scheme for dry core experiments"
+0 0 0 0 0 0
+# Filename
+"forcing", 1, "seconds", 1, "days", "time",
+# Parameters
+"dynamics", "slp",        "slp",        "forcing", "all", .false., "none", 2,
+"dynamics", "bk",         "hybi",       "forcing", "all", .false., "none", 2,
+"dynamics", "pk",         "hyai",       "forcing", "all", .false., "none", 2,
+"forcing",  "teq",        "teq",        "forcing", "all", .false., "none", 2,
+"forcing",  "forcing",    "forcing",    "forcing", "all", .false., "none", 2,
+"forcing",  "ndamp",      "ndamp",      "forcing", "all", .false., "none", 2,
+"forcing",  "ndamp_mean", "ndamp_mean", "forcing", "all", .false., "none", 2,
+"forcing",  "ndamp_anom", "ndamp_anom", "forcing", "all", .false., "none", 2,
+"forcing",  "rdamp",      "rdamp",      "forcing", "all", .false., "none", 2,
+"forcing",  "rdamp_mean", "rdamp_mean", "forcing", "all", .false., "none", 2,
+"forcing",  "rdamp_anom", "rdamp_anom", "forcing", "all", .false., "none", 2,
+EOF
+# Run model
+echo "Getting forcing data..."
 run_model 0 1 $pforcing || raise "Forcing run failed. Check log files in the forcing folder."
 $init && exit 0
 
@@ -287,7 +327,7 @@ $init && exit 0
 # starting points from control for spin-down ensemble experiments
 ##############################################################################
 estatus=0
-days=$(nml_parse $nml days) # number of days in each block
+days=$(nml_parse $expdir/input.nml days) # number of days in each block
 if [ $mode -eq 0 ]; then
   # Prepare for the loop
   echo "Running control experiment from day $tstart to day $tend on $cores cores, restart every $days days."
@@ -318,9 +358,9 @@ if [ $mode -eq 0 ]; then
       rdir="$rinit" # use specific day sequence
       unset rinit # only ever use this on first 'day' of a new experiment; for subsequent days, continue from earlier day block
     fi
-    unset ipflags
+    unset pflags
     if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
-      ipflags=" -k" && echo "Full resolution netcdf files will be kept."
+      pflags=" -k" && echo "Full resolution netcdf files will be kept."
     fi
     dir_setup $cday $cdir # sets up working directory, cd into it
     if [ $? -eq 0 ]; then # setup returns 1 if directory is present and 'resume' option is set
@@ -377,9 +417,9 @@ else
       [ $cday -eq 0 ] && rdir=$fstart || \
         rdir=$prefix-spindown$mode-d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
       # Run the model and combine output
-      unset ipflags
+      unset pflags
       if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
-        ipflags=" -k" && echo "Full resolution netcdf files will be kept."
+        pflags=" -k" && echo "Full resolution netcdf files will be kept."
       fi
       dir_setup $cday $cdir # sets up working directory, cd into it
       if [ $? == 0 ]; then # returns 1 if we were requested not to overwrite old directories

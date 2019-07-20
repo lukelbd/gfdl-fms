@@ -1,19 +1,20 @@
 #!/bin/bash
-################################################################################
-# Script for compiling fortran source code on various machines
-################################################################################
-# Raise error
-raise() {
-  echo "Error: $@" 1>&2
-  exit 1
-}
-# Follow link
+usage="compile [spectral|bgrid|fv|shallow|barotropic]"
+doc="Compiles an executable for running a model from the GFDL Flexible
+Modelling System. Includes a spectral model, a B-grid model, a finite-volume
+model, a shallow-water model, anad a barotropic model.
+
+Usage
+
+  $usage
+"
+# Compiler flags
 cwd=$(readlink -f ${0})
 cwd=${cwd%/*}
 cd $cwd
-# Variables
-# Maybe need -lmpl, -lmpichf90, -lmpl, -lm, -lz
-optimization='-O3' # see: hs_katmos2-tgrad_t42l20s_p0060.000p0040.000c/
+source header.sh
+root=$cwd/../
+optimization='-O3'
 ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 cppdefs='-Duse_libMPI -Duse_netCDF'
 optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
@@ -21,7 +22,6 @@ floatflags='-Ktrap=fp' # add =flag1,flag2,... for options; controls floating poi
 ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl' # include netcdf libs
 mpflags='-Mmpi=mpich' # special 'pgflags', adds flags -L$MPILIB -lfmpich -lmpich; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
 cppdefs='-Duse_libMPI -Duse_netCDF' # not sure what this does
-
 # Host-specific settings
 case ${HOSTNAME%%.*} in
   cheyenne*)
@@ -35,14 +35,12 @@ case ${HOSTNAME%%.*} in
     module load impi &>/dev/null
     lib=$NETCDF/lib
     include=$NETCDF/include
-    root=$HOME/gfdl-drycore
     fortran=mpiifort
     cpp=mpiicc
     ldflags='-qopenmp' # see: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
   ;; monde) # where code is compiled
     lib=/usr/lib64/mpich/lib
     include=/usr/include/mpich-x86_64
-    root=$HOME/gfdl-drycore
     fortran=pgf90
     cpp=pgcc
     fflags='-Ktrap=fp' # see: http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
@@ -50,7 +48,6 @@ case ${HOSTNAME%%.*} in
   ;; euclid) # everything is bunched together
     include=/usr/local/include
     lib=/usr/local/lib
-    root=/birner-home/ldavis/gfdl-drycore
     fortran=pgf90
     cpp=pgcc
     fflags='-Ktrap=fp'
@@ -58,21 +55,30 @@ case ${HOSTNAME%%.*} in
   ;; *) raise "Unknown host, must configure library and binary locations before running." ;;
 esac
 
-# Directories
-pathnames=$root/path_names                      # change this to pick different blocks of code
+# Parse input
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) echo "$doc" && exit 0 ;;
+    -*) raise "Unknown argument \"$1\"." ;;
+    *)
+      [ -n "$model" ] && raise "Must specify just one model name."
+      model=$1
+      pathnames=$root/path_names_${model}
+      [ -r $pathnames ] || raise "Invalid model \"${model}\" -- could not find file \"$pathnames\"."
+      ;;
+  esac
+  shift
+done
+[ -z "$model" ] && raise "Must specify model name."
+# Files
 mkmf=$root/bin/mkmf                            # path to executable mkmf
 mkmftemplate=$root/bin/mkmf.template           # template of most basic settings
 mppnsource=$root/postprocessing/mppnccombine.c # source code
-# Make sure necessary things tools are in path
-! [ -d bin ]           && mkdir bin || echo "Warning: Leaving old compiled source."
-! [ -r $pathnames ]    && raise "Could not find path_names file $pathnames."
-! [ -r $mppnsource ]   && raise "Could not find mppnccombine source code."
-! [ -r $mkmftemplate ] && raise "Could not find Makefile template."
-! [ -r $mkmf ]         && raise "Could not find Makefile-generating utility $mkmf."
+[ -d bin ] || mkdir bin
+[ -r $mppnsource ]   || raise "Could not find mppnccombine source code."
+[ -r $mkmftemplate ] || raise "Could not find Makefile template."
+[ -r $mkmf ]         || raise "Could not find Makefile-generating utility $mkmf."
 
-#------------------------------------------------------------------------------
-# Build executable model code and post-processing tool
-#------------------------------------------------------------------------------#
 # Create mppnccombine
 # NOTE: Don't compile with mpi support, just runs it a bunch of times
 time=$(date +%s)
@@ -93,9 +99,8 @@ DELIM
 cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
 
 # Create makefile
-# cat mkmf.template
 echo "Generating Makefile..."
-$mkmf -p fms.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
+$mkmf -p ${model}.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
   $root/src/shared/mpp/include $root/src/shared/include ${include[@]} # the other include files
 [ $? -ne 0 ] && raise "Mppnccombine compilation failed."
 

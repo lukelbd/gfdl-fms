@@ -31,9 +31,9 @@ module idealized_topog_mod
 ! <DESCRIPTION>
 !   Interfaces generate simple sinusoidal-shaped mountains from
 !   parameters specified by either argument list or namelist input.
-!   The mountain shapes are controlled by the height, latitudinal 
-!   extent and wavenumber we want. See Gerber and Polvani (2009) 
-!   and citations thereafter for further details. 
+!   The mountain shapes are controlled by the height, latitudinal
+!   extent and wavenumber we want. See Gerber and Polvani (2009)
+!   and citations thereafter for further details.
 !   Some modifications to that setup may be present below.
 ! </DESCRIPTION>
 
@@ -51,7 +51,7 @@ private
 public :: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_sinusoidal_topog
 
 !-----------------------------------------------------------------------
-! <NAMELIST NAME="gaussian_topog_nml"><USED FOR GAUSSIAN MOUNTAIN>
+! <NAMELIST NAME="idealized_topog_nml"><USED FOR GAUSSIAN MOUNTAIN>
 !   <DATA NAME="height" UNITS="meter" TYPE="real" DIM="(mxmtns)" DEFAULT="0.">
 !     Height in meters of the Gaussian mountains.
 !    </DATA>
@@ -71,9 +71,9 @@ public :: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_si
 !     <TT>gaussian_topog_init</TT> is called.  The namelist variables
 !     are dimensioned (by 10), so that multiple mountains can be generated.
 !
-!     Internal parameter mxmtns = 10. By default no mountains are generated. 
+!     Internal parameter mxmtns = 10. By default no mountains are generated.
 !    </DATA>
-! <NAMELIST NAME="gaussian_topog_nml"><USED FOR SINUSOIDAL MOUNTAIN>
+! <NAMELIST NAME="idealized_topog_nml"><USED FOR SINUSOIDAL MOUNTAIN>
 !   <DATA NAME="height_sin" UNITS="meter" TYPE="real" DIM="(scalar)" DEFAULT="0.">
 !     Height in meters of the sinusoidal mountains (h0). Must be positive definitive (height_sin >=0).
 !    </DATA>
@@ -81,7 +81,7 @@ public :: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_si
 !     latitudinal bounds for the topographic forcing typically 25 and 65degN (in degrees).
 !    </DATA>
 !   <DATA NAME="m, Amp2" UNITS="n/a" TYPE="int" DIM="(scalar)" DEFAULT="0.">
-!     m is wavenumber of the sine wave (m=1 or 2); 
+!     m is wavenumber of the sine wave (m=1 or 2);
 !     Amp2 (=1 or 0) allows an addition of wavenumber 2 wave to wavenumber 1 (only an option if m=1).
 !     If Amp2 = 0 only one wavenumber wave is present; if Amp2=1 we have wave-1 and wave-2 topography
 !     Amp2 can actually also be more than one - but then we are weighting the wave-2 topography more.
@@ -95,24 +95,24 @@ public :: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_si
 
    integer, parameter :: maxmts = 1 !originally was set to 10
 
-   real, dimension(maxmts) :: height = 0.
-   real, dimension(maxmts) ::  olon  = 0.
-   real, dimension(maxmts) ::  olat  = 0.
-   real, dimension(maxmts) ::  wlon  = 0.
-   real, dimension(maxmts) ::  wlat  = 0.
-   real, dimension(maxmts) ::  rlon  = 0.
-   real, dimension(maxmts) ::  rlat  = 0.
-   real :: height_sin = 0. ! default is no mountain - change to e.g. 3000m in namelist!
-   integer ::  m  = 1 ! set m =1 as default
-   integer ::  Amp2  = 0 ! set Amp2= 0 as default
-   logical ::  uneven_sin  = .false. ! default is to have e.g. 2 mountains with the same height; if .true. they won't be.
-   real ::  uneven_fac  = 1.  ! default is 1 - i.e. 2nd mountain same height as first; the factor can be anything though (if e.g. =2 then 2nd mountain is twice as tall as first).
-   !real ::  lat0  = 25. ! this will generally be the same - no need for its definition from namelist
-   !real ::  lat1  = 65. ! -||-
-   real :: deltalat = 0.
+   real, dimension(maxmts) :: height = 0.0
+   real, dimension(maxmts) ::  olon  = 0.0
+   real, dimension(maxmts) ::  olat  = 0.0
+   real, dimension(maxmts) ::  wlon  = 0.0
+   real, dimension(maxmts) ::  wlat  = 0.0
+   real, dimension(maxmts) ::  rlon  = 0.0
+   real, dimension(maxmts) ::  rlat  = 0.0
+   integer :: m = 1 ! set m =1 as default
+   integer :: Amp2 = 0 ! set Amp2= 0 as default
+   logical :: uneven_sin = .false. ! default is to have e.g. 2 mountains with the same height; if .true. they won't be.
+   real :: uneven_fac = 1.0 ! default is 1 - i.e. 2nd mountain same height as first; the factor can be anything though (if e.g. =2 then 2nd mountain is twice as tall as first).
+   real :: height_sin = 0.0 ! default is no mountain - change to e.g. 3000m in namelist!
+   real :: deltalat = 0.0
+   !real :: lat0 = 25.0 ! this will generally be the same - no need for its definition from namelist
+   !real :: lat1 = 65.0 ! -||-
 
-   
-   namelist /gaussian_topog_nml/ height, olon, olat, wlon, wlat, rlon, rlat, height_sin, m, Amp2, uneven_sin, uneven_fac, deltalat !, lat0, lat1
+   namelist /idealized_topog_nml/ height, olon, olat, wlon, wlat, rlon, rlat, &
+      m, Amp2, height_sin, uneven_sin, uneven_fac, deltalat !, lat0, lat1
 ! </NAMELIST>
 
 !-----------------------------------------------------------------------
@@ -139,7 +139,7 @@ contains
 !     Returns a land surface topography that consists of a "set" of
 !     simple Gaussian-shaped mountains.  The height, position,
 !     width, and elongation of the mountains can be controlled
-!     by variables in namelist <LINK SRC="#NAMELIST">&#38;gaussian_topog_nml</LINK>.
+!     by variables in namelist <LINK SRC="#NAMELIST">&#38;idealized_topog_nml</LINK>.
 !   </DESCRIPTION>
 !   <TEMPLATE>
 !     <B>call gaussian_topog_init</B> ( lon, lat, zsurf )
@@ -181,7 +181,7 @@ integer :: n
     zsurf = zsurf + get_gaussian_topog ( lon, lat, height(n), &
                 olon(n), olat(n), wlon(n), wlat(n), rlon(n), rlat(n))
   enddo
- module_is_initialized = .TRUE.                    
+ module_is_initialized = .TRUE.
 
 end subroutine gaussian_topog_init
 ! </SUBROUTINE>
@@ -294,7 +294,7 @@ end function get_gaussian_topog
 !   </OVERVIEW>
 !   <DESCRIPTION>
 !     Returns a land surface topography that consists of a "set" of
-!     simple sinusoidal-shaped mountains.  The height, position/width, 
+!     simple sinusoidal-shaped mountains.  The height, position/width,
 !     and number of mountains can be controlled by variables in namelist.
 !   </DESCRIPTION>
 !   <TEMPLATE>
@@ -328,13 +328,13 @@ real, intent(out) :: zsurf(:,:)
 
   if (do_nml) call read_namelist
 
-! get mountains only if height_sin is not set to zero.
-  zsurf(:,:) = 0.
-  if ( height_sin > 0. ) then
+  ! Get mountains only if height_sin is not set to zero.
+  zsurf(:,:) = 0.0
+  if ( height_sin > 0.0 ) then
     zsurf = zsurf + get_sinusoidal_topog ( lon, lat, height_sin, &
                 m, Amp2, uneven_sin, uneven_fac, deltalat ) !, lat0, lat1 )
   endif
-  module_is_initialized = .TRUE.                    
+  module_is_initialized = .TRUE.
 
 end subroutine sinusoidal_topog_init
 ! </SUBROUTINE>
@@ -370,7 +370,7 @@ end subroutine sinusoidal_topog_init
 !     move for 10deg lat north/south with +/-10.); default should be deltalat=0.
 !    </IN>
 !   <IN NAME="m, Amp2" UNITS="n/a" TYPE="int" DIM="(scalar)" DEFAULT="0.">
-!     m is wavenumber of the sine wave (m=1 or 2); 
+!     m is wavenumber of the sine wave (m=1 or 2);
 !     Amp2 (=1 or 0) allows an addition of wavenumber 2 wave to wavenumber 1 (only an option if m=1).
 !     If Amp2 = 0 only one wavenumber wave is present; if Amp2=1 we have wave-1 and wave-2 topography
 !     Amp2 can actually also be more than one - but then we are weighting the wave-2 topography more.
@@ -398,7 +398,7 @@ function get_sinusoidal_topog ( lon, lat, height_sin, m, Amp2, uneven_sin, uneve
 
 real, intent(in)  :: lon(:), lat(:)
 real, intent(in)  :: height_sin
-integer, intent(in) :: m, Amp2 
+integer, intent(in) :: m, Amp2
 logical, intent(in) :: uneven_sin
 real, intent(in) :: uneven_fac, deltalat !, lat00, lat11
 real :: zsurf(size(lon,1),size(lat,1))
@@ -421,7 +421,7 @@ real    :: tpi, dtr, lat00, lat11
   lat11 = 65. + deltalat
 
   lat00 = dtr * lat00
-  lat11 = dtr * lat11  
+  lat11 = dtr * lat11
   zsurf(:,:) = 0.
 ! compute sinusoidal-shaped mountain
   do j=1,size(lat(:))
@@ -456,8 +456,8 @@ subroutine read_namelist
    if ( file_exist('input.nml')) then
       unit = open_namelist_file ( )
       ierr=1; do while (ierr /= 0)
-         read  (unit, nml=gaussian_topog_nml, iostat=io, end=10)
-         ierr = check_nml_error(io,'gaussian_topog_nml')
+         read  (unit, nml=idealized_topog_nml, iostat=io, end=10)
+         ierr = check_nml_error(io,'idealized_topog_nml')
       enddo
  10   call close_file (unit)
    endif
@@ -466,7 +466,7 @@ subroutine read_namelist
 
    if (mpp_pe() == mpp_root_pe()) then
       unit = stdlog()
-      write (unit, nml=gaussian_topog_nml)
+      write (unit, nml=idealized_topog_nml)
    endif
 
    do_nml = .false.

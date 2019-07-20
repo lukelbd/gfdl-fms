@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-usage='run [-hnrsif] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] MODEL DIR'
+usage='run [-hnifr] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] MODEL_TYPE EXPERIMENT_DIR'
 doc="This script runs the GFDL dry core model in blocks of N days, and processes
 the parallel output NetCDF files with './process' before merging them. This means
 pressure level interpolation, heat flux calcualtion, etc. are done in parallel
@@ -90,17 +90,16 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
   shift
 done
 [ -n "$gpflags" ] && echo "Passing these flags to processing script: $gpflags"
-# Executables
+# Errors and messages
 # export MPI_SHEPHERD=true # see: https://www2.cisl.ucar.edu/sites/default/files/intro_to_hpc.pdf
 # when mpiexec_mpt used, MPI_SHEPHERD required, but this failed for me
 run=mpirun # for running in parallel
-model=$sdir/${model}.x
 which $run &>/dev/null || raise "$run not found in \$PATH."
-# Errors and messages
 ! $init && [ $tend -eq 0 ] && raise "You must pass an end time"
-[ -z "$model" ] && raise "You must declare the model name."
+[ -z "$model" ] && raise "You must declare the model type name."
 [ -z "$expdir" ] && raise "You must declare the experiment directory."
-[ -x "$model" ] || raise "The executable $model is missing."
+[ -x "${sdir}/${model}.x" ] || raise "Invalid model \"${model}\". The executable \"${sdir}/${model}.x\" is missing."
+model=$sdir/${model}.x
 # Check user scripts
 which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
 [ -z "$pinline" ] && pinline=$sdir/process
@@ -305,14 +304,15 @@ cat >$expdir/forcing/diag_table <<EOF
 "forcing", 1, "seconds", 1, "days", "time",
 # Parameters
 "dynamics", "slp",        "slp",        "forcing", "all", .false., "none", 2,
+"dynamics", "height",     "z",          "forcing", "all", .false., "none", 2,
 "dynamics", "bk",         "hybi",       "forcing", "all", .false., "none", 2,
 "dynamics", "pk",         "hyai",       "forcing", "all", .false., "none", 2,
 "forcing",  "teq",        "teq",        "forcing", "all", .false., "none", 2,
 "forcing",  "forcing",    "forcing",    "forcing", "all", .false., "none", 2,
 "forcing",  "ndamp",      "ndamp",      "forcing", "all", .false., "none", 2,
+"forcing",  "rdamp",      "rdamp",      "forcing", "all", .false., "none", 2,
 "forcing",  "ndamp_mean", "ndamp_mean", "forcing", "all", .false., "none", 2,
 "forcing",  "ndamp_anom", "ndamp_anom", "forcing", "all", .false., "none", 2,
-"forcing",  "rdamp",      "rdamp",      "forcing", "all", .false., "none", 2,
 "forcing",  "rdamp_mean", "rdamp_mean", "forcing", "all", .false., "none", 2,
 "forcing",  "rdamp_anom", "rdamp_anom", "forcing", "all", .false., "none", 2,
 EOF

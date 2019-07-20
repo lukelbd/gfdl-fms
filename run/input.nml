@@ -46,8 +46,8 @@
   triang_trunc              = .true.,                 ! triangular or rhomboidal truncation?
   topography_option         = 'flat',                 ! 'flat' for no topography, 'input' to use a NetCDf file in INPUT
   vert_coord_option         = 'even_sigma',           ! 'input' to use &vert_coordinate_nml, 'pk_sigma' for Polvani and Kushner (2002) spacing, 'even_sigma' for evenly spaced sigma, and a few other options
-  valid_range_t             = 100., 500.,             ! model fails if temperatures exceed this range
-  reference_sea_level_press = 101325.,                ! atmospheric mass
+  valid_range_t             = 100.0, 500.0,             ! model fails if temperatures exceed this range
+  reference_sea_level_press = 101325.0,                ! atmospheric mass
 /
 
 ! Forcing namelist, with new parameters for configuring new forcing schemes

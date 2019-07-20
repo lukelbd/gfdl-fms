@@ -14,7 +14,7 @@ mppnccombine=${rdir}/mppnccombine.x # netcdf combine executable
 # Merge
 t0=$(date +%s)
 echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
-! [ -d ../netcdf ] && mkdir ../netcdf # make directory if doesn't exist
+[ -d ../netcdf ] || mkdir ../netcdf # make directory if doesn't exist
 $mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
 [ $? -ne 0 ] && raise "mppnccombine failed."
 mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc

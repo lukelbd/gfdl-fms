@@ -430,11 +430,12 @@ subroutine forcing_init ( axes, Time )
     missing_value=missing_value, range=(/100.,400./) )
 
   ! Newtonian damping rate
-  id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
-    'thermal damping coefficient', 'sec-1', &
-    missing_value=missing_value )
+  if (.not. ndamp_decomp) then
+    id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
+      'thermal damping coefficient', 'sec-1', &
+      missing_value=missing_value )
 
-  if (ndamp_decomp) then
+  else
     id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
       'thermal damping coefficient, mean component', 'sec-1', &
       missing_value=missing_value )
@@ -445,11 +446,12 @@ subroutine forcing_init ( axes, Time )
   endif
 
   ! Rayleigh damping rate
-  id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
-    'frictional damping coefficient', 'sec-1', &
-    missing_value=missing_value )
+  if (.not. rdamp_decomp) then
+    id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
+      'frictional damping coefficient', 'sec-1', &
+      missing_value=missing_value )
 
-  if (rdamp_decomp) then
+  else
     id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
       'frictional damping coefficient, mean component', 'sec-1', &
       missing_value=missing_value )

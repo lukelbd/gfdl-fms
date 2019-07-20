@@ -120,8 +120,8 @@ $new && [ -d $expdir ] && raise "Working directory already exists. Continuing...
 [ -d $expdir ] || mkdir $expdir || raise "Could not create experiment directory \"$expdir\"."
 
 ################################################################################
-# Function for restarting model; put correct files in correct place so 
-# fms can read them and continue iteration from a previous state.
+# Function for restarting model. Puts correct files in correct place so
+# model can read them and continue iteration from a previous state.
 ################################################################################
 # Take one argument: directory where restart files exist
 copy_restart() {
@@ -152,8 +152,8 @@ copy_restart() {
 }
 
 ################################################################################
-# Set up input files for model executable to read
-# Takes two arguments: 1) the working directory, and 2) the iteration mode
+# Function for setting up a directory for the model executable to
+# run inside.
 ################################################################################
 dir_setup() {
   # Set up working directory, and move there
@@ -239,24 +239,9 @@ dir_setup() {
 }
 
 ################################################################################
-# Function for running the next model step from a previous step
-# applying post-processing to a previous model step in the background, and organizing
-# all the NetCDF files
+# Function for running the next model step and applying post-processing to
+# the resulting NetCDF files.
 ################################################################################
-# Process exit status
-exit_check() {
-  estatus=$1
-  if [ $estatus != 0 ]; then
-    echo "Exit status $estatus from post-processing previous block..." 1>&2
-    case $estatus in
-      1) raise "NetCDF files missing. Check model.log." ;;
-      2) raise "Something failed during plev or isen interpolation. Check log.process." ;;
-      3) raise "Something failed while getting plev zonal means. Check log.process." ;;
-      4) raise "Something failed while getting plev or isen params. Check log.process." ;;
-      *) raise "Check log.process; other/miscellaneous failure." ;;
-    esac
-  fi
-}
 run_model() {
   # Run model in parallel
   local usage cday ncores process
@@ -268,7 +253,7 @@ run_model() {
   echo "Running model..."
   $run -np $ncores ./${model##*/} &>model.log
   grep -E 'EXIT CODE: [1-9]|FATAL from PE|WARNING from PE' model.log &>/dev/null && \
-    raise "Bad exit code from model run step."
+    raise "Bad exit status from model run step. Check $(pwd)/model.log"
   tmodel=$(cat model.log | grep "Total runtime*" | xargs | cut -d " " -f 5)
   echo "Model time: ${tmodel%.*}s." # is just max of the two
 
@@ -281,9 +266,9 @@ run_model() {
   # Previously we set processor affinities, but didn't help much
   if [ -n "$process" ]; then
     echo "Calling processing script with flags: $(echo $pflags $gpflags | xargs)"
-    $process $pflags $gpflags &>log.process
-    exit_check $?
-    tprocess=$(tail -1 log.process | sed 's/[^0-9]*//g')
+    $process $pflags $gpflags &>process.log
+    [ $? -ne 0 ] && raise "Exit status $? from processing NetCDF files. Check $(pwd)/process.log"
+    tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Process time: ${tprocess%.*}s."
   fi
 }
@@ -378,8 +363,8 @@ if [ $mode -eq 0 ]; then
     nday=$((cday + days))
   done
   # Last file
-  if [ -r log.process ]; then
-    tprocess=$(tail -1 log.process | sed 's/[^0-9]*//g')
+  if [ -r process.log ]; then
+    tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Final process time: ${tprocess%.*}s."
   fi
   # Message
@@ -434,8 +419,8 @@ else
     echo "Spindown from $eday completed successfully in $(($(date +%s) - ts)) seconds!"
     echo "Timestamp: $(date)."
   done
-  if [ -r log.process ]; then
-    tprocess=$(tail -1 log.process | sed 's/[^0-9]*//g')
+  if [ -r process.log ]; then
+    tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Final process time: ${tprocess%.*}s."
   fi
   echo "The spindown runs completed successfuly in $(($(date +%s) - t0)) seconds!"

@@ -25,10 +25,10 @@ module forcing_mod
 
 use     constants_mod, only: seconds_per_day, kappa, cp_air, grav, pi
 
-use           fms_mod, only: error_mesg, FATAL, file_exist, field_size, &
+use           fms_mod, only: error_mesg, FATAL, file_exist,       &
                              open_namelist_file, check_nml_error, &
-                             mpp_pe, mpp_root_pe, close_file, &
-                             write_version_number, stdlog, &
+                             mpp_pe, mpp_root_pe, close_file,     &
+                             write_version_number, stdlog,        &
                              uppercase
 
 use  time_manager_mod, only: time_type, get_time
@@ -558,29 +558,29 @@ subroutine get_heating ( tdt, mask )
   real, intent(inout), dimension(:,:,:,:) :: tdt
   real, intent(in), dimension(:,:,:), optional :: mask
 
-  if (.not. file_exist('INPUT/heating.data.nc')) then
-    call error_mesg('get_heating','input_heating=.true. but INPUT/heating.data.nc does not exist', FATAL)
-  endif
-  call mpp_get_global_domain(grid_domain, xsize=global_num_lon, ysize=global_num_lat)
-  call field_size('INPUT/topography.data.nc', 'zsurf', siz)
-  if ( siz(1) == global_num_lon .or. siz(2) == global_num_lat ) then
-    call read_data('INPUT/topography.data.nc', 'zsurf', surf_height, grid_domain)
-  else
-    write(ctmp1(1: 4),'(i4)') siz(1)
-    write(ctmp1(9:12),'(i4)') siz(2)
-    write(ctmp2(1: 4),'(i4)') global_num_lon
-    write(ctmp2(9:12),'(i4)') global_num_lat
-    call error_mesg ('get_topography','Topography file contains data on a '// &
-            ctmp1//' grid, but atmos model grid is '//ctmp2, FATAL)
-  endif
-
-  !    Spectrally truncate the topography
-  call get_spec_domain(ms, me, ns, ne)
-  allocate(spec_tmp(ms:me, ns:ne))
-  call trans_grid_to_spherical(surf_height,spec_tmp)
-  call trans_spherical_to_grid(spec_tmp,surf_height)
-  deallocate(spec_tmp)
-  surf_geopotential = grav*surf_height
+  ! if (.not. file_exist('INPUT/heating.data.nc')) then
+  !   call error_mesg('get_heating','input_heating=.true. but INPUT/heating.data.nc does not exist', FATAL)
+  ! endif
+  ! call mpp_get_global_domain(grid_domain, xsize=global_num_lon, ysize=global_num_lat)
+  ! call field_size('INPUT/topography.data.nc', 'zsurf', siz)
+  ! if ( siz(1) == global_num_lon .or. siz(2) == global_num_lat ) then
+  !   call read_data('INPUT/topography.data.nc', 'zsurf', surf_height, grid_domain)
+  ! else
+  !   write(ctmp1(1: 4),'(i4)') siz(1)
+  !   write(ctmp1(9:12),'(i4)') siz(2)
+  !   write(ctmp2(1: 4),'(i4)') global_num_lon
+  !   write(ctmp2(9:12),'(i4)') global_num_lat
+  !   call error_mesg ('get_topography','Topography file contains data on a '// &
+  !           ctmp1//' grid, but atmos model grid is '//ctmp2, FATAL)
+  ! endif
+  !
+  ! !    Spectrally truncate the topography
+  ! call get_spec_domain(ms, me, ns, ne)
+  ! allocate(spec_tmp(ms:me, ns:ne))
+  ! call trans_grid_to_spherical(surf_height,spec_tmp)
+  ! call trans_spherical_to_grid(spec_tmp,surf_height)
+  ! deallocate(spec_tmp)
+  ! surf_geopotential = grav*surf_height
 
 end subroutine
 

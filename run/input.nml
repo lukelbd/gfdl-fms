@@ -57,7 +57,7 @@
 ! This syntax indicates you are setting a length-2 array.
 &forcing_nml
   no_forcing      = .false.,    ! turn off forcing altogether (same as setting each 'k' to zero)
-  input_damping   = .false.,    ! use input file for diabatic heating
+  input_heating   = .false.,    ! use input file for diabatic heating
   teq_mode        = 'hs',       ! can be hs, pk, or pkmod (i.e. my custom stuff)
   damp_mode       = 'hs',       ! can be hs, pk, or pkmod (i.e. my custom stuff)
   conserve_energy = .true.,     ! employ frictional warming

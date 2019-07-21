@@ -55,7 +55,7 @@ logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
 logical :: surf_schneider = .false. ! HS94 or Schneider surface temp?
-logical :: input_damping = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
+logical :: input_heating = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
 integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
 real :: sigma_b  = 0.7
@@ -84,7 +84,7 @@ real, dimension(2) :: kfric   = fill_value
 real, dimension(2) :: ksponge = fill_value
 
 !-----------------------------------------------------------------------
-namelist /forcing_nml/  no_forcing, input_damping, conserve_energy, &
+namelist /forcing_nml/  no_forcing, input_heating, conserve_energy, &
   teq_mode, damp_mode, strat_sponge, strat_vtx, strat_damp, surf_schneider, &
   t_zero, t_mean, t_strat, exp_h, delh, delv, eps, &
   lat_ref, vtx_edge, vtx_width, vtx_gamma, &
@@ -188,8 +188,8 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
   tdt_damp = 0.0
-  if (input_damping) then
-    call load_damping ( tdt_damp, mask=mask )
+  if (input_heating) then
+    call get_heating ( tdt_damp, mask=mask )
   else
     call thermal_damping ( lat, sigma, p_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
@@ -548,7 +548,7 @@ subroutine forcing_end
 
 end subroutine forcing_end
 
-subroutine load_damping ( tdt, mask )
+subroutine get_heating ( tdt, mask )
 
   !-----------------------------------------------------------------------
   !
@@ -557,7 +557,30 @@ subroutine load_damping ( tdt, mask )
   !-----------------------------------------------------------------------
   real, intent(inout), dimension(:,:,:,:) :: tdt
   real, intent(in), dimension(:,:,:), optional :: mask
-  ! real, dimension(size(tdt,2),size(tdt,3)) :: tdt_mean
+
+  ! if (.not. file_exist('INPUT/heating.data.nc')) then
+  !   call error_mesg('get_heating','input_heating=.true. but INPUT/heating.data.nc does not exist', FATAL)
+  ! endif
+  ! call mpp_get_global_domain(grid_domain, xsize=global_num_lon, ysize=global_num_lat)
+  ! call field_size('INPUT/topography.data.nc', 'zsurf', siz)
+  ! if ( siz(1) == global_num_lon .or. siz(2) == global_num_lat ) then
+  !   call read_data('INPUT/topography.data.nc', 'zsurf', surf_height, grid_domain)
+  ! else
+  !   write(ctmp1(1: 4),'(i4)') siz(1)
+  !   write(ctmp1(9:12),'(i4)') siz(2)
+  !   write(ctmp2(1: 4),'(i4)') global_num_lon
+  !   write(ctmp2(9:12),'(i4)') global_num_lat
+  !   call error_mesg ('get_topography','Topography file contains data on a '// &
+  !           ctmp1//' grid, but atmos model grid is '//ctmp2, FATAL)
+  ! endif
+  !
+  ! !    Spectrally truncate the topography
+  ! call get_spec_domain(ms, me, ns, ne)
+  ! allocate(spec_tmp(ms:me, ns:ne))
+  ! call trans_grid_to_spherical(surf_height,spec_tmp)
+  ! call trans_spherical_to_grid(spec_tmp,surf_height)
+  ! deallocate(spec_tmp)
+  ! surf_geopotential = grav*surf_height
 
 end subroutine
 

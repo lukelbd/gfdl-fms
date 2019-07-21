@@ -7,20 +7,31 @@
 nml_maxlen=60
 unset nml_message nml_names nml_values nml_count
 
-# Raise error with input message, and print usage information
+# Raise error with input message, and print usage variable
 raise() {
-  echo "Usage: $usage"
-  echo "Error: $@" 1>&2
+  echo "Usage: $usage" >&2
+  echo "Error: $@" >&2
   exit 1
 }
 
-# Get global namelist value
+# Print namelist value
 nml_parse() {
-  cat "$1" | sed 's/!.*//g' | grep "$2" | cut -d= -f2 | xargs | sed 's/,$//g'
+  local usage value
+  usage="nml_parse NAMELIST_FILE PARAM_NAME"
+  [ $# -ne 2 ] && raise "nml_parse needs 2 arguments."
+  [ -r "$1" ] || raise "Namelist \"$1\" not found"
+  value=$(cat "$1" | sed 's/!.*//g' | grep "$2" | cut -d= -f2 | xargs | sed 's/,$//g')
+  [ -z "$value" ] && raise "Param \"$2\" not found in namelist \"$1\"."
+  echo "$value"
 }
 
-# Replace namelist value for a *local* spindown experiment
-nml_replace() { # first argument is param name, second argument is value
+# Replace namelist value
+nml_replace() {
+  local usage space
+  usage="nml_replace NAMELIST_FILE PARAM1 VALUE1 [PARAM2 VALUE2...]"
+  space='\([ \t]*\)' # space atom; more readable to set it as a variable
+  [ $# -lt 1 ] && raise "nml_replace needs at least 1 argument."
+  [ -r "$1" ] || raise "Namelist \"$1\" not found"
   nml_file=$1
   shift
   while [ $# -gt 0 ]; do
@@ -28,8 +39,7 @@ nml_replace() { # first argument is param name, second argument is value
     if [ -n "$2" ] && [ "$2" != "-" ] && [ "$2" != "''" ]; then
       # Replace
       ! grep '^[ \t]*\b'"${1}"'\b' $nml_file &>/dev/null && \
-        raise "Param \"${1}\" not found in namelist."
-      space='\([ \t]*\)' # space atom; more readable to set it as a variable
+        raise "Param \"${1}\" not found in namelist \"$nml_file\"."
       sed -i 's/^'"${space}${1}${space}"'='"${space}"'.*$/\1'"${1}"'\2=\3'"${2}"',/g' $nml_file
       # For message
       if [ $((${#1}+${#nml_names})) -gt $nml_maxlen ]; then

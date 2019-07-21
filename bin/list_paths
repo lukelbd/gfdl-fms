@@ -51,13 +51,12 @@ find $* -type f \
  -o -name \*.inc \
  \) -print >> $src
 sort -u $src > path_names
-echo "A list of the files you checked out is in the file path_names ..."
+echo "A list of the files you checked out is in path_names ..."
 
 touch $doc# create the file if it doesn't exist
 find $* -type f \
  \( -name \*.html \
  -o -name \*.ps   \
- -o -name \*.txt  \
  -o -name \*.pdf  \
  -o -name \*.jpg  \
  -o -name readme  \
@@ -69,10 +68,10 @@ if( -z $src )exit
 cat $src >> $doc
 
 #write path_names.html file
-echo "<title>Documentation in current working directory</title>"           > path_names.html
-echo "<h1>Documentation in current working directory</h1>"                >> path_names.html
-sort -u $doc | awk '{print "<p><a href=\"" $1 "\">" $1 "</a>"}'           >> path_names.html
+echo "<title>GFDL Flexible Modeling System full documentation</title>" > path_names.html
+echo "<h1>GFDL Flexible Modeling System full documentation</h1>"      >> path_names.html
+sort -u $doc | awk '{print "<p><a href=\"" $1 "\">" $1 "</a>"}' >> path_names.html
 
-echo "Documentation on the files you checked out is accessible on the web at"
+echo "Documentation is accessible in your browser at"
 echo "file://localhost$cwd/path_names.html ..."
 rm $src $doc

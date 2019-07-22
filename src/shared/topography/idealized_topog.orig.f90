@@ -71,7 +71,7 @@ public :: gaussian_topog_init, get_gaussian_topog
 
 !-----------------------------------------------------------------------
 
-character(len=128) :: version = '$Id: gaussian_topog.f90,v 13.0 2006/03/28 21:43:27 fms Exp $'
+character(len=128) :: version = '$Id: idealized_topog.f90,v 13.0 2006/03/28 21:43:27 fms Exp $'
 character(len=128) :: tagname = '$Name: latest $'
 
 logical :: do_nml = .true.

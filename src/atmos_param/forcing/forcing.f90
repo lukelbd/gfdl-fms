@@ -24,11 +24,12 @@ module forcing_mod
 !-----------------------------------------------------------------------
 
 use     constants_mod, only: seconds_per_day, kappa, cp_air, grav, pi
-
-use           fms_mod, only: error_mesg, FATAL, file_exist,       &
-                             open_namelist_file, check_nml_error, &
-                             mpp_pe, mpp_root_pe, close_file,     &
-                             write_version_number, stdlog,        &
+use   mpp_domains_mod, only: mpp_get_global_domain
+use    transforms_mod, only: grid_domain
+use           fms_mod, only: error_mesg, FATAL, file_exist, field_size, &
+                             read_data, open_namelist_file, check_nml_error, &
+                             mpp_pe, mpp_root_pe, close_file, &
+                             write_version_number, stdlog, &
                              uppercase
 
 use  time_manager_mod, only: time_type, get_time
@@ -37,7 +38,6 @@ use  diag_manager_mod, only: register_diag_field, send_data
 
 use  field_manager_mod, only: MODEL_ATMOS, parse
 use tracer_manager_mod, only: query_method, get_number_tracers
-use grid_fourier_mod, only:   get_deg_lon
 
 implicit none
 private
@@ -55,7 +55,7 @@ logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
 logical :: surf_schneider = .false. ! HS94 or Schneider surface temp?
-logical :: input_heating = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
+logical :: locked_heating = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
 integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
 integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
 real :: sigma_b  = 0.7
@@ -72,6 +72,10 @@ real :: q0_global = 0.0, q0_surface = 0.0
 real :: q0_lsp = 0.0, m_lsp = 1.0, p0_lsp = 800.0, pt_lsp = 200.0, lat0_lsp = 45.0, slat_lsp = 10.0
 real :: trflux = 1.e-5 ! surface flux for optional tracer
 real :: trsink = -4.   ! damping time for tracer
+!     ----- Allocatable params -----
+! This mimics how surf_geopot in spectral_dynamics is allocated during
+! initialization.
+real, allocatable, dimension(:,:,:) :: tdt_locked
 !     ----- Account for optional mean, anomaly component damping -----
 ! Namelist can specify just *one* value, and it will be
 ! inserted in first position, default Held-Suarez used for second position
@@ -84,7 +88,7 @@ real, dimension(2) :: kfric   = fill_value
 real, dimension(2) :: ksponge = fill_value
 
 !-----------------------------------------------------------------------
-namelist /forcing_nml/  no_forcing, input_heating, conserve_energy, &
+namelist /forcing_nml/  no_forcing, locked_heating, conserve_energy, &
   teq_mode, damp_mode, strat_sponge, strat_vtx, strat_damp, surf_schneider, &
   t_zero, t_mean, t_strat, exp_h, delh, delv, eps, &
   lat_ref, vtx_edge, vtx_width, vtx_gamma, &
@@ -104,17 +108,17 @@ character(len=128) :: tagname='$Name: latest $'
 real :: trdamp
 real, dimension(2) :: tktrop, tkbl, tkstrat, tkmeso, vkfric, vksponge
 integer :: id_forcing, id_teq, &
-  id_ndamp, id_rdamp, id_tdt, id_udt, id_vdt, id_uvdt, &
+  id_ndamp, id_rdamp, id_tdt, id_udt, id_vdt, &
   id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
-  id_tdt_mean, id_tdt_anom, id_uvdt_mean, id_uvdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
+  id_tdt_mean, id_tdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
   id_tdt_diss, id_heat_diss, &
-  id_uvdt_sponge, id_udt_sponge, id_vdt_sponge
+  id_udt_sponge, id_vdt_sponge
 real    :: missing_value = -1.e10
 logical :: module_is_initialized = .false.
 
 contains
 
-subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
+subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full, &
                          u, v, t, r, um, vm, tm, rm, udt, vdt, tdt, &
                          rdt, mask, kbot )
 
@@ -122,8 +126,8 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   type(time_type), intent(in)                      :: Time
   integer, intent(in)                              :: is, ie, js, je
   real, intent(in)                                 :: dt
-  real, intent(in),    dimension(:,:)              :: lat
-  real, intent(in),    dimension(:,:,:)            :: p_half, p_full
+  real, intent(in),    dimension(:,:)              :: lon, lat
+  real, intent(in),    dimension(:,:,:)            :: p_half, p_full, z_full
   real, intent(in),    dimension(:,:,:)            :: u, v, t, um, vm, tm
   real, intent(in),    dimension(:,:,:,:)          :: r, rm
   real, intent(inout), dimension(:,:,:)            :: udt, vdt, tdt
@@ -137,21 +141,13 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   real, dimension(size(t,1),size(t,2),size(t,3))   :: teq, tdt_force, tdt_diss, udt_diss, vdt_diss
   real, dimension(size(r,1),size(r,2),size(r,3))   :: rst, rtnd
   real, dimension(size(t,1),size(t,2),size(t,3),2) :: tdt_damp, tdamp, udt_damp, vdt_damp, rdamp
-  real, dimension(size(t,1))                       :: lon_out
-  real, dimension(size(t,1),size(t,2))             :: lon
-  integer :: i, j, k, kb, l, n, num_tracers
+  integer :: i, j, k, kb, c, n, num_tracers
   logical :: used
   real    :: flux, sink, value
   character(len=128) :: scheme, params
 
   if (no_forcing) return
   if (.not.module_is_initialized) call error_mesg ('forcing','forcing_init has not been called', FATAL)
-
-  !     Get longitude
-  call get_deg_lon(lon_out)
-  do i=is,ie
-    lon(i,:) = lon_out(i)*pi/180.
-  enddo
 
   !     Surface pressure and sigma coordinates
   if (present(kbot)) then
@@ -180,18 +176,17 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
     ! Apply sponge damping
     call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, mask=mask )
     ! Diagnostic output
-    if (id_uvdt_sponge > 0) used = send_data(id_uvdt_sponge, sqrt(udt_sponge**2 + vdt_sponge**2), Time, is, js)
     if (id_udt_sponge  > 0) used = send_data(id_udt_sponge, udt_sponge, Time, is, js)
     if (id_vdt_sponge  > 0) used = send_data(id_vdt_sponge, vdt_sponge, Time, is, js)
   endif
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
-  tdt_damp = 0.0
-  if (input_heating) then
-    call get_heating ( tdt_damp, mask=mask )
+  if (locked_heating) then
+    tdt_damp(:,:,:,1) = tdt_locked(:,:,:)
+    tdt_damp(:,:,:,2) = 0.0
   else
-    call thermal_damping ( lat, sigma, p_full, t, tdt_damp, tdamp, teq, mask=mask )
+    call thermal_damping ( lat, sigma, p_full, z_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
 
   !     Butler et al. (2010) radiative forcing and other forcing
@@ -243,9 +238,7 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   if (id_vdt        > 0) used = send_data(id_vdt,        sum(vdt_damp,4),   Time, is, js)
   if (id_vdt_mean   > 0) used = send_data(id_vdt_mean,   vdt_damp(:,:,:,1), Time, is, js)
   if (id_vdt_anom   > 0) used = send_data(id_vdt_anom,   vdt_damp(:,:,:,2), Time, is, js)
-  if (id_uvdt       > 0) used = send_data(id_uvdt,       sqrt(sum(udt_damp,4)**2 + sum(vdt_damp,4)**2), Time, is, js)
-  if (id_uvdt_mean  > 0) used = send_data(id_uvdt_mean,  sqrt(udt_damp(:,:,:,1)**2 + vdt_damp(:,:,:,1)**2), Time, is, js)
-  if (id_uvdt_anom  > 0) used = send_data(id_uvdt_anom,  sqrt(udt_damp(:,:,:,2)**2 + vdt_damp(:,:,:,2)**2), Time, is, js)
+
   if (id_rdamp      > 0) used = send_data(id_rdamp,      rdamp(:,:,:,1), Time, is, js)
   if (id_rdamp_mean > 0) used = send_data(id_rdamp_mean, rdamp(:,:,:,1), Time, is, js)
   if (id_rdamp_anom > 0) used = send_data(id_rdamp_anom, rdamp(:,:,:,2), Time, is, js)
@@ -253,10 +246,12 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
   tdt = tdt + tdt_damp(:,:,:,1) + tdt_damp(:,:,:,2) + tdt_force + tdt_diss ! mean and anomaly components
 
   if (id_forcing    > 0) used = send_data(id_forcing,    tdt_force,         Time, is, js)
+
   if (id_teq        > 0) used = send_data(id_teq,        teq,               Time, is, js)
   if (id_tdt        > 0) used = send_data(id_tdt,        sum(tdt_damp,4),   Time, is, js)
   if (id_tdt_mean   > 0) used = send_data(id_tdt_mean,   tdt_damp(:,:,:,1), Time, is, js)
   if (id_tdt_anom   > 0) used = send_data(id_tdt_anom,   tdt_damp(:,:,:,2), Time, is, js)
+
   if (id_ndamp      > 0) used = send_data(id_ndamp,      tdamp(:,:,:,1),    Time, is, js)
   if (id_ndamp_mean > 0) used = send_data(id_ndamp_mean, tdamp(:,:,:,1),    Time, is, js)
   if (id_ndamp_anom > 0) used = send_data(id_ndamp_anom, tdamp(:,:,:,2),    Time, is, js)
@@ -292,20 +287,40 @@ subroutine forcing ( is, ie, js, je, dt, Time, lat, p_half, p_full, &
 
 end subroutine forcing
 
-subroutine forcing_init ( axes, Time )
+subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
 
   !-----------------------------------------------------------------------
   !
   !           Routine for initializing the model with an
   !           initial condition at rest (u & v = 0)
+  !           Also loads heating data for locked heating runs
   !
   !-----------------------------------------------------------------------
+  ! Notes
+  ! * Starting point was topography.data.nc, which is loaded globally
+  !   during call to atmosphere_init in atmos_model.f90, which calls
+  !   spectral_dynamics_init, which calls read_restart_or_do_coldstart, which
+  !   loads surface geopotential only if this is a cold start (because it is
+  !   saved in restart files), which calls spectral_init_cond, which calls
+  !   get_topography, which loads data on global grid.
+  ! * Also input geopotential height instead of using scale height to
+  !   approximate it. Easy in spectral, but hard for bgrid, because
+  !   geopoential height is not normally passed throuth atmosphere.f90. Need
+  !   to compute from compute_height.f90 in bgrid_vert.f90, by providing it
+  !   with 'fisl' eta=1 geopotential from the Dynam structure and with
+  !   temperature and stuff from the Var structure. Similar routine compute_geop_height
+  !   is called in bgrid_horiz_adjust.f90 by press_grad, called in bgrid_driver.f90.
+  ! * Seems that all init methods work with *global* grid, then subsequent
+  !   calls to amosphere subroutine are given partial data.
 
   integer, intent(in) :: axes(4)
+  integer, intent(in) :: is, ie, js, je, num_levels
   type(time_type), intent(in) :: Time
+  integer :: global_num_lon, global_num_lat, siz(4)
+  character(len=20) :: ctmp1='     by      by     ', ctmp2='     by      by     '
 
   !-----------------------------------------------------------------------
-  integer unit, io, ierr, l
+  integer unit, io, ierr, c
 
   !     ----- Read namelist -----
 
@@ -325,7 +340,51 @@ subroutine forcing_init ( axes, Time )
 
   if (no_forcing) return
 
-  !     ----- Apply defaults here -----
+  !     ----- Error checks -----
+
+  if (vtx_edge <  0) then
+    call error_mesg ('forcing_init','polar vortex edge must be in northern hemisphere', FATAL)
+  end if
+  if ((trim(damp_mode) .ne. 'hs') .and. (trim(damp_mode) .ne. 'pk') .and. (trim(damp_mode) .ne. 'pkmod')) then
+    call error_mesg ('forcing_init', 'damp_mode="' // damp_mode // '" not recognized', FATAL)
+  end if
+  if ((trim(teq_mode) .ne. 'hs') .and. (trim(teq_mode) .ne. 'pk') .and. (trim(teq_mode) .ne. 'pkmod')) then
+    call error_mesg ('forcing_init', 'teq_mode="' // teq_mode // '" not recognized', FATAL)
+  end if
+  if ((trim(strat_damp) .ne. 'constant') .and. (trim(strat_damp) .ne. 'linear')) then
+    call error_mesg ('forcing_init', 'strat_damp="' // strat_damp // '" not recognized', FATAL)
+  endif
+
+  !     ----- Allocate and load damping -----
+  if (locked_heating) then
+    allocate(tdt_locked(is:ie, js:je, num_levels))
+    if (file_exist('INPUT/heating.data.nc')) then
+      call mpp_get_global_domain(grid_domain, xsize=global_num_lon, ysize=global_num_lat)
+      call field_size('INPUT/heating.data.nc', 'tdt', siz)
+      if (( siz(1) == global_num_lon .or. siz(2) == global_num_lat ) .and. siz(3) == num_levels) then
+        call read_data('INPUT/heating.data.nc', 'tdt', tdt_locked, grid_domain)
+      else
+        write(ctmp1(1: 4),'(i4)') siz(1)
+        write(ctmp1(9:12),'(i4)') siz(2)
+        write(ctmp1(17:20),'(i4)') siz(3)
+        write(ctmp2(1: 4),'(i4)') global_num_lon
+        write(ctmp2(9:12),'(i4)') global_num_lat
+        write(ctmp2(17:20),'(i4)') num_levels
+        call error_mesg ('forcing_init','Topography file contains data on a '// &
+                ctmp1//' grid, but atmos model grid is '//ctmp2, FATAL)
+      endif
+    else
+      call error_mesg('forcing_init', 'locked_heating=.true. but INPUT/heating.data.nc does not exist', FATAL)
+    endif
+  endif
+
+  !     ----- For tracers -----
+
+  trdamp = 0.0
+  if (trsink < 0) trsink = -seconds_per_day*trsink
+  if (trsink > 0) trdamp = 1.0/trsink
+
+  !     ----- Apply defaults -----
 
   if (kbl(1)==fill_value)     kbl(1)     = -4.
   if (ktrop(1)==fill_value)   ktrop(1)   = -40.
@@ -375,47 +434,22 @@ subroutine forcing_init ( axes, Time )
   vksponge = 0.0
   tkstrat  = 0.0
   tkmeso   = 0.0
-  do l=1,2
+  do c=1,2
     ! Convert timescales from days to seconds
-    if (kbl(l)     < 0) kbl(l)     = -seconds_per_day*kbl(l)
-    if (ktrop(l)   < 0) ktrop(l)   = -seconds_per_day*ktrop(l)
-    if (kfric(l)   < 0) kfric(l)   = -seconds_per_day*kfric(l)
-    if (ksponge(l) < 0) ksponge(l) = -seconds_per_day*ksponge(l)
-    if (kstrat(l)  < 0) kstrat(l)  = -seconds_per_day*kstrat(l)
-    if (kmeso(l)   < 0) kmeso(l)   = -seconds_per_day*kmeso(l)
+    if (kbl(c)     < 0) kbl(c)     = -seconds_per_day*kbl(c)
+    if (ktrop(c)   < 0) ktrop(c)   = -seconds_per_day*ktrop(c)
+    if (kfric(c)   < 0) kfric(c)   = -seconds_per_day*kfric(c)
+    if (ksponge(c) < 0) ksponge(c) = -seconds_per_day*ksponge(c)
+    if (kstrat(c)  < 0) kstrat(c)  = -seconds_per_day*kstrat(c)
+    if (kmeso(c)   < 0) kmeso(c)   = -seconds_per_day*kmeso(c)
     ! Get coefficients from timescales
-    if (kbl(l)     > 0) tkbl(l)     = 1.0/kbl(l)
-    if (ktrop(l)   > 0) tktrop(l)   = 1.0/ktrop(l)
-    if (kfric(l)   > 0) vkfric(l)   = 1.0/kfric(l)
-    if (ksponge(l) > 0) vksponge(l) = 1.0/ksponge(l)
-    if (kstrat(l)  > 0) tkstrat(l)  = 1.0/kstrat(l)
-    if (kmeso(l)   > 0) tkmeso(l)   = 1.0/kmeso(l)
+    if (kbl(c)     > 0) tkbl(c)     = 1.0/kbl(c)
+    if (ktrop(c)   > 0) tktrop(c)   = 1.0/ktrop(c)
+    if (kfric(c)   > 0) vkfric(c)   = 1.0/kfric(c)
+    if (ksponge(c) > 0) vksponge(c) = 1.0/ksponge(c)
+    if (kstrat(c)  > 0) tkstrat(c)  = 1.0/kstrat(c)
+    if (kmeso(c)   > 0) tkmeso(c)   = 1.0/kmeso(c)
   enddo
-
-  !     ----- Error check -----
-  ! if (sigma_b < sigma_lo .or. sigma_lo < sigma_hi) then
-  !   call error_mesg ('forcing','sigma thresholds must satisfy sigma_b > sigma_lo > sigma_hi', FATAL)
-  ! end if
-  if (vtx_edge <  0) then
-    call error_mesg ('forcing','polar vortex edge must be in northern hemisphere', FATAL)
-  end if
-
-  !     ----- Test string modes -----
-  if ((trim(damp_mode) .ne. 'hs') .and. (trim(damp_mode) .ne. 'pk') .and. (trim(damp_mode) .ne. 'pkmod')) then
-    call error_mesg ('forcing','Unrecognized thermal damping mode "' // damp_mode // '"', FATAL)
-  end if
-  if ((trim(teq_mode) .ne. 'hs') .and. (trim(teq_mode) .ne. 'pk') .and. (trim(teq_mode) .ne. 'pkmod')) then
-    call error_mesg ('forcing','Unrecognized thermal damping mode "' // teq_mode // '"', FATAL)
-  end if
-  if ((trim(strat_damp) .ne. 'constant') .and. (trim(strat_damp) .ne. 'linear')) then
-    call error_mesg ('forcing','Unrecognized stratospheric damping option "' // strat_damp // '"', FATAL)
-  endif
-
-  !     ----- For tracers -----
-
-  trdamp = 0.0
-  if (trsink < 0) trsink = -seconds_per_day*trsink
-  if (trsink > 0) trdamp = 1.0/trsink
 
   !     ----- Register diagnostic fields -----
 
@@ -429,42 +463,14 @@ subroutine forcing_init ( axes, Time )
     'equilibrium temperature', 'deg_K', &
     missing_value=missing_value, range=(/100.,400./) )
 
-  ! Newtonian damping rate
-  if (.not. ndamp_decomp) then
-    id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
-      'thermal damping coefficient', 'sec-1', &
-      missing_value=missing_value )
-
-  else
-    id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
-      'thermal damping coefficient, mean component', 'sec-1', &
-      missing_value=missing_value )
-
-    id_ndamp_anom = register_diag_field ( mod_name, 'ndamp_anom', axes(1:3), Time, &
-      'thermal damping coefficient, anomaly component', 'sec-1', &
-      missing_value=missing_value )
-  endif
-
-  ! Rayleigh damping rate
-  if (.not. rdamp_decomp) then
-    id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
-      'frictional damping coefficient', 'sec-1', &
-      missing_value=missing_value )
-
-  else
-    id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
-      'frictional damping coefficient, mean component', 'sec-1', &
-      missing_value=missing_value )
-
-    id_rdamp_anom = register_diag_field ( mod_name, 'rdamp_anom', axes(1:3), Time, &
-      'frictional damping coefficient, anomaly component', 'sec-1', &
-      missing_value=missing_value )
-  endif
-
-  ! Rate of temperature change
+  ! Rate of temp change due to damping and damping rate
   id_tdt = register_diag_field ( mod_name, 'tdt', axes(1:3), Time, &
     'heating', 'deg_K/sec',    &
     missing_value=missing_value     )
+
+  id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
+    'thermal damping coefficient', 'sec-1', &
+    missing_value=missing_value )
 
   if (ndamp_decomp) then
     id_tdt_mean = register_diag_field ( mod_name, 'tdt_mean', axes(1:3), Time, &
@@ -474,27 +480,27 @@ subroutine forcing_init ( axes, Time )
     id_tdt_anom = register_diag_field ( mod_name, 'tdt_anom', axes(1:3), Time, &
       'heating, anomaly component', 'deg_K/sec',    &
       missing_value=missing_value     )
+
+    id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
+      'thermal damping coefficient, mean component', 'sec-1', &
+      missing_value=missing_value )
+
+    id_ndamp_anom = register_diag_field ( mod_name, 'ndamp_anom', axes(1:3), Time, &
+      'thermal damping coefficient, anomaly component', 'sec-1', &
+      missing_value=missing_value )
   endif
 
-  ! Rate of wind change by sponge
-  id_uvdt_sponge = register_diag_field ( mod_name, 'uvdt_sponge', axes(1:3), Time, &
-    'sponge wind damping', 'm/s2',       &
-    missing_value=missing_value     )
+  ! Heating by dissipation
+  if (conserve_energy) then
+    id_tdt_diss = register_diag_field ( mod_name, 'tdt_diss_rdamp', axes(1:3), &
+      Time, 'dissipative heating from frictional damping', 'deg_K/sec',&
+      missing_value=missing_value     )
 
-  id_udt_sponge = register_diag_field ( mod_name, 'udt_sponge', axes(1:3), Time, &
-    'sponge zonal wind damping', 'm/s2',       &
-    missing_value=missing_value     )
+    id_heat_diss = register_diag_field ( mod_name, 'diss_rdamp', axes(1:2), &
+      Time, 'integrated dissipative heating for frictional damping', 'W/m2')
+  endif
 
-  id_vdt_sponge = register_diag_field ( mod_name, 'vdt_sponge', axes(1:3), Time, &
-    'sponge meridional wind damping', 'm/s2',       &
-    missing_value=missing_value     )
-
-  ! Frictional damping of wind
-  ! Includes total and directional components
-  id_uvdt = register_diag_field ( mod_name, 'uvdt', axes(1:3), Time, &
-    'frictional wind damping', 'm/s2',       &
-    missing_value=missing_value     )
-
+  ! Rate of wind change due to friction
   id_udt = register_diag_field ( mod_name, 'udt', axes(1:3), Time, &
     'frictional zonal wind damping', 'm/s2',       &
     missing_value=missing_value     )
@@ -503,15 +509,11 @@ subroutine forcing_init ( axes, Time )
     'frictional meridional wind damping', 'm/s2',  &
     missing_value=missing_value     )
 
+  id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
+    'frictional damping coefficient', 'sec-1', &
+    missing_value=missing_value )
+
   if (rdamp_decomp) then
-    id_uvdt_mean = register_diag_field ( mod_name, 'uvdt_mean', axes(1:3), Time, &
-      'frictional wind damping, mean component', 'm/s2',       &
-      missing_value=missing_value     )
-
-    id_uvdt_anom = register_diag_field ( mod_name, 'uvdt_anom', axes(1:3), Time, &
-      'frictional wind damping, anomaly component', 'm/s2',       &
-      missing_value=missing_value     )
-
     id_udt_mean = register_diag_field ( mod_name, 'udt_mean', axes(1:3), Time, &
       'frictional zonal wind damping, mean component', 'm/s2',       &
       missing_value=missing_value     )
@@ -527,16 +529,24 @@ subroutine forcing_init ( axes, Time )
     id_vdt_anom = register_diag_field ( mod_name, 'vdt_anom', axes(1:3), Time, &
       'frictional meridional wind damping, anomaly component', 'm/s2',  &
       missing_value=missing_value     )
+
+    id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
+      'frictional damping coefficient, mean component', 'sec-1', &
+      missing_value=missing_value )
+
+    id_rdamp_anom = register_diag_field ( mod_name, 'rdamp_anom', axes(1:3), Time, &
+      'frictional damping coefficient, anomaly component', 'sec-1', &
+      missing_value=missing_value )
   endif
 
-  if (conserve_energy) then
-    id_tdt_diss = register_diag_field ( mod_name, 'tdt_diss_rdamp', axes(1:3), &
-      Time, 'dissipative heating from frictional damping', 'deg_K/sec',&
-      missing_value=missing_value     )
+  ! Rate of wind change by sponge
+  id_udt_sponge = register_diag_field ( mod_name, 'udt_sponge', axes(1:3), Time, &
+    'sponge zonal wind damping', 'm/s2',       &
+    missing_value=missing_value     )
 
-    id_heat_diss = register_diag_field ( mod_name, 'diss_rdamp', axes(1:2), &
-      Time, 'integrated dissipative heating for frictional damping', 'W/m2')
-  endif
+  id_vdt_sponge = register_diag_field ( mod_name, 'vdt_sponge', axes(1:3), Time, &
+    'sponge meridional wind damping', 'm/s2',       &
+    missing_value=missing_value     )
 
   module_is_initialized  = .true.
 
@@ -548,44 +558,7 @@ subroutine forcing_end
 
 end subroutine forcing_end
 
-subroutine get_heating ( tdt, mask )
-
-  !-----------------------------------------------------------------------
-  !
-  !           Impose forcing loaded from file
-  !
-  !-----------------------------------------------------------------------
-  real, intent(inout), dimension(:,:,:,:) :: tdt
-  real, intent(in), dimension(:,:,:), optional :: mask
-
-  ! if (.not. file_exist('INPUT/heating.data.nc')) then
-  !   call error_mesg('get_heating','input_heating=.true. but INPUT/heating.data.nc does not exist', FATAL)
-  ! endif
-  ! call mpp_get_global_domain(grid_domain, xsize=global_num_lon, ysize=global_num_lat)
-  ! call field_size('INPUT/topography.data.nc', 'zsurf', siz)
-  ! if ( siz(1) == global_num_lon .or. siz(2) == global_num_lat ) then
-  !   call read_data('INPUT/topography.data.nc', 'zsurf', surf_height, grid_domain)
-  ! else
-  !   write(ctmp1(1: 4),'(i4)') siz(1)
-  !   write(ctmp1(9:12),'(i4)') siz(2)
-  !   write(ctmp2(1: 4),'(i4)') global_num_lon
-  !   write(ctmp2(9:12),'(i4)') global_num_lat
-  !   call error_mesg ('get_topography','Topography file contains data on a '// &
-  !           ctmp1//' grid, but atmos model grid is '//ctmp2, FATAL)
-  ! endif
-  !
-  ! !    Spectrally truncate the topography
-  ! call get_spec_domain(ms, me, ns, ne)
-  ! allocate(spec_tmp(ms:me, ns:ne))
-  ! call trans_grid_to_spherical(surf_height,spec_tmp)
-  ! call trans_spherical_to_grid(spec_tmp,surf_height)
-  ! deallocate(spec_tmp)
-  ! surf_geopotential = grav*surf_height
-
-end subroutine
-
-
-subroutine thermal_damping ( lat, sigma, p_full, t, tdt, tdamp, teq, mask )
+subroutine thermal_damping ( lat, sigma, p_full, z_full, t, tdt, tdamp, teq, mask )
 
 !-----------------------------------------------------------------------
 !
@@ -596,7 +569,7 @@ subroutine thermal_damping ( lat, sigma, p_full, t, tdt, tdamp, teq, mask )
 ! Easier to multiply with temperature, and allows us to impose longitudinally
 ! varying forcing profile with ease.
 real, intent(in),  dimension(:,:)   :: lat
-real, intent(in),  dimension(:,:,:) :: sigma, p_full, t
+real, intent(in),  dimension(:,:,:) :: sigma, p_full, z_full, t
 real, intent(in),  dimension(:,:,:), optional :: mask
 real, intent(out), dimension(:,:,:)   :: teq
 real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
@@ -604,7 +577,7 @@ real, intent(out), dimension(:,:,:,:) :: tdt, tdamp
 real, dimension(size(t,1),size(t,2)) :: &
   t_surf, t_hs, t_pk, t_summer, t_winter, &
   lat_hfact, lat_vfact, w_vtx, &
-  z_full, z_vortex, z_offset, p_trop, p_norm ! intermediate containers
+  z_vortex, z_offset, z_norm, p_trop, p_norm ! intermediate containers
 real, dimension(size(t,1),size(t,2),2) :: &
   t_decomp, tkhi_decomp, tksurf_decomp ! mean-anomaly decomp containers
 real, dimension(size(t,2)) :: &
@@ -613,7 +586,7 @@ real :: p0, pb, pfact
 real :: z_vortex_ref, p_trop_ref, t_surf_ref
 real :: lat_ref_r, lat_vfact_ref, lat_hfact_ref
 real :: vtx_edge_r, vtx_width_r
-integer :: i, j, k, l, m, seconds, days
+integer :: i, j, k, c, seconds, days
 
 !-----------------------------------------------------------------------
 !     Constants
@@ -638,8 +611,8 @@ else
   lat_hfact_ref = 1 - cos(lat_ref_r)**(2 - exp_h)
 endif
 ! Surface damping
-do l=1,2
-  tksurf_decomp(:,:,l) = (tkbl(l)-tktrop(l))*cos(lat)**exp_b
+do c=1,2
+  tksurf_decomp(:,:,c) = (tkbl(c)-tktrop(c))*cos(lat)**exp_b
 enddo
 
 !-----------------------------------------------------------------------
@@ -696,23 +669,23 @@ do k=1,size(t,3)
   ! WARNING: In assignment e.g. a = max(a, 0), end up with float NaNs
   ! when fortran tried to assign the scalar. Some weird fortran thing.
   ! We need two variables for this kind of statement!
-  z_full = -H*log(p_full(:,:,k)/p0)
+  z_norm = z_full(:,:,k)/1000. ! from m to km
   p_norm = p_full(:,:,k)/p0
   t_hs   = (t_surf - delv*log(p_norm)*lat_vfact) * (p_norm)**kappa
   if (trim(teq_mode) == 'hs') then
     teq(:,:,k) = max( t_hs, t_strat )
   else
-    call tstd_summer( t_strat, z_offset, z_full, t_summer )
-    call tstd_winter( t_strat, vtx_gamma, z_vortex, z_full, t_winter )
+    call tstd_summer( t_strat, z_offset, z_norm, t_summer )
+    call tstd_winter( t_strat, vtx_gamma, z_vortex, z_norm, t_winter )
     t_pk = (1.0 - w_vtx)*t_summer + (w_vtx)*t_winter
-    where (z_full >= z_vortex)
+    where (z_norm >= z_vortex)
       teq(:,:,k) = max( t_pk, t_min )
     elsewhere
       teq(:,:,k) = max( t_hs, t_strat )
     endwhere
   endif
 
-  do l=1,2
+  do c=1,2
     !-----------------------------------------------------------------------
     !
     !     Damping rate calculations
@@ -720,28 +693,28 @@ do k=1,size(t,3)
     !
     !-----------------------------------------------------------------------
     ! Alternatively use smooth version below: see Holton-Mass model, 1976 (Journal of Atmospheric Sciences)
-    ! tkhi = tkstrat + (1.0 + tanh((z_full-35.0)/7.0))*(tkmeso-tkstrat)/2.0
+    ! tkhi = tkstrat + (1.0 + tanh((z_norm-35.0)/7.0))*(tkmeso-tkstrat)/2.0
     if (trim(damp_mode) == 'hs') then
       where (sigma(:,:,k) > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(sigma(:,:,k) - sigma_b)/(1.0-sigma_b)
+        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c)*(sigma(:,:,k) - sigma_b)/(1.0-sigma_b)
       elsewhere
-        tdamp(:,:,k,l) = tktrop(l)
+        tdamp(:,:,k,c) = tktrop(c)
       endwhere
     else
       if (trim(strat_damp) == 'constant') then ! *constant* above tropopause region
-        tkhi_decomp(:,:,l) = tkstrat(l)
+        tkhi_decomp(:,:,c) = tkstrat(c)
       else
-        tkhi_decomp(:,:,l) = min(tkmeso(l), &
-          tkstrat(l) + (tkmeso(l) - tkstrat(l))*(z_full - z_vortex - z_kdepth)/(50 - z_vortex - z_kdepth))
+        tkhi_decomp(:,:,c) = min(tkmeso(c), &
+          tkstrat(c) + (tkmeso(c) - tkstrat(c))*(z_norm - z_vortex - z_kdepth)/(50 - z_vortex - z_kdepth))
       endif
       where (sigma(:,:,k) > sigma_b)
-        tdamp(:,:,k,l) = tktrop(l) + tksurf_decomp(:,:,l)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
-      elsewhere (z_full < z_vortex) ! below tropopause, not some fixed height
-        tdamp(:,:,k,l) = tktrop(l)
-      elsewhere (z_full >= z_vortex .and. z_full < z_vortex + z_kdepth)
-        tdamp(:,:,k,l) = tktrop(l) - (tktrop(l) - tkstrat(l))*(z_full - z_vortex)/z_kdepth
+        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
+      elsewhere (z_norm < z_vortex) ! below tropopause, not some fixed height
+        tdamp(:,:,k,c) = tktrop(c)
+      elsewhere (z_norm >= z_vortex .and. z_norm < z_vortex + z_kdepth)
+        tdamp(:,:,k,c) = tktrop(c) - (tktrop(c) - tkstrat(c))*(z_norm - z_vortex)/z_kdepth
       elsewhere
-        tdamp(:,:,k,l) = tkhi_decomp(:,:,l)
+        tdamp(:,:,k,c) = tkhi_decomp(:,:,c)
       endwhere
 
     endif
@@ -758,14 +731,14 @@ do k=1,size(t,3)
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t(:,:,k) - teq(:,:,k))
       tdamp(:,:,k,2) = tdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
-    else if (l==1) then
+    else if (c==1) then
       ! Damp the mean
       t_bar = sum(t(:,:,k), 1)/size(t, 1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_bar
       enddo
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t_decomp(:,:,1) - teq(:,:,k))
-    else if (l==2) then
+    else if (c==2) then
       ! Damp the anomaly
       t_decomp(:,:,2) = t(:,:,k) - t_decomp(:,:,1) ! anomaly relative to mean
       tdt(:,:,k,2) = -tdamp(:,:,k,2)*t_decomp(:,:,2)
@@ -775,14 +748,14 @@ enddo
 
 if (present(mask)) then
   teq = teq * mask
-  do l=1,2
-    tdt(:,:,:,l) = tdt(:,:,:,l) * mask
+  do c=1,2
+    tdt(:,:,:,c) = tdt(:,:,:,c) * mask
   enddo
 endif
 
 end subroutine thermal_damping
 
-subroutine tstd_summer ( t_tp, z_off, z_full, teq )
+subroutine tstd_summer ( t_tp, z_off, z_km, teq )
 
   !----------------------------------------------------------------------------!
   ! US standard atmosphere directly from lapse rate formula
@@ -790,13 +763,13 @@ subroutine tstd_summer ( t_tp, z_off, z_full, teq )
   !----------------------------------------------------------------------------!
 
   real, intent(in)                  :: t_tp
-  real, intent(in), dimension(:,:)  :: z_off, z_full
+  real, intent(in), dimension(:,:)  :: z_off, z_km
   real, intent(out), dimension(:,:) :: teq
-  real, dimension(size(z_full,1),size(z_full,2)) :: z_coord
+  real, dimension(size(z_km,1),size(z_km,2)) :: z_coord
   real :: t_1, t_sp, t_2
   real :: z_extra
 
-  z_coord = z_full - z_off ! want to add offset to RHS of below comparisons, same as subtracting from LHS!
+  z_coord = z_km - z_off ! want to add offset to RHS of below comparisons, same as subtracting from LHS!
   z_extra = (216.65 - t_tp) / 2.8 ! if t_tp is colder than US std, offset height in equation down
 
   ! See: https://en.wikipedia.org/wiki/Barometric_formula#Source_code
@@ -821,7 +794,7 @@ subroutine tstd_summer ( t_tp, z_off, z_full, teq )
 
 end subroutine tstd_summer
 
-subroutine tstd_winter ( t_tp, vtx_gamma, z_vortex, z_full, teq )
+subroutine tstd_winter ( t_tp, vtx_gamma, z_vortex, z_km, teq )
 
   !----------------------------------------------------------------------------!
   ! Polar vortex adaptation
@@ -830,14 +803,14 @@ subroutine tstd_winter ( t_tp, vtx_gamma, z_vortex, z_full, teq )
   !----------------------------------------------------------------------------!
 
   real, intent(in)                  :: t_tp, vtx_gamma
-  real, intent(in), dimension(:,:)  :: z_full, z_vortex
+  real, intent(in), dimension(:,:)  :: z_km, z_vortex
   real, intent(out), dimension(:,:) :: teq
 
   ! New version with simple vortex lapse rate
-  where (z_full <= z_vortex)
+  where (z_km <= z_vortex)
     teq = t_tp
   elsewhere
-    teq = t_tp - vtx_gamma*(z_full - z_vortex)
+    teq = t_tp - vtx_gamma*(z_km - z_vortex)
   endwhere
 
   ! Previous version with calculation done in pressure coords
@@ -952,16 +925,16 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
   !-----------------------------------------------------------------------
   real, dimension(size(u,2)) :: u_mean, v_mean
   real, dimension(size(u,1),size(u,2),2) :: u_decomp, v_decomp
-  integer :: i, j, k, l
+  integer :: i, j, k, c
   !-----------------------------------------------------------------------
 
   do k=1,size(u,3)
-    do l=1,2
+    do c=1,2
       !    ---- Determine damping coeffs ----
       where (sigma(:,:,k) <= 1.0 .and. sigma(:,:,k) > sigma_b)
-        rdamp(:,:,k,l) = vkfric(l)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
+        rdamp(:,:,k,c) = vkfric(c)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
       elsewhere
-        rdamp(:,:,k,l) = 0.0
+        rdamp(:,:,k,c) = 0.0
       endwhere
 
       !    ---- Apply damping ----
@@ -974,7 +947,7 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
         rdamp(:,:,k,2) = rdamp(:,:,k,1)
         rdamp(:,:,k,2) = rdamp(:,:,k,1)
         exit ! i.e. break from top-level do loop
-      else if (l==1) then
+      else if (c==1) then
         ! Damp the means
         u_mean = sum(u(:,:,k),1)/size(u,1) ! mean
         v_mean = sum(v(:,:,k),1)/size(v,1)
@@ -984,7 +957,7 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
         enddo
         udt(:,:,k,1)    = -rdamp(:,:,k,1)*u_decomp(:,:,1)
         vdt(:,:,k,1)    = -rdamp(:,:,k,1)*v_decomp(:,:,1)
-      else if (l==2) then
+      else if (c==2) then
         ! Damp the anomaly
         u_decomp(:,:,2) = u(:,:,k) - u_decomp(:,:,1) ! anomaly
         v_decomp(:,:,2) = v(:,:,k) - v_decomp(:,:,1)
@@ -995,9 +968,9 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
   enddo
 
   if (present(mask)) then
-    do l=1,2
-      udt(:,:,:,l) = udt(:,:,:,l) * mask
-      vdt(:,:,:,l) = vdt(:,:,:,l) * mask
+    do c=1,2
+      udt(:,:,:,c) = udt(:,:,:,c) * mask
+      vdt(:,:,:,c) = vdt(:,:,:,c) * mask
     enddo
   endif
 

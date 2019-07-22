@@ -23,11 +23,10 @@ module topography_mod
 !   The interpolation scheme conserves the area-weighted average
 !   of the input data by using module horiz_interp.
 !
-!   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <LINK SRC="gaussian_topog.html">idealized_topog_mod</LINK>.
+!   The interfaces get_gaussian_topog and gaussian_topog_init are documented in <LINK SRC="idealized_topog.html">idealized_topog_mod</LINK>.
 ! </DESCRIPTION>
 
 use idealized_topog_mod, only: gaussian_topog_init, get_gaussian_topog, sinusoidal_topog_init, get_sinusoidal_topog
-!use sinusoidal_topog_mod, only: sinusoidal_topog_init, get_sinusoidal_topog
 use   horiz_interp_mod, only: horiz_interp
 
 use            fms_mod, only: file_exist, check_nml_error,               &

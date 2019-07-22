@@ -63,6 +63,7 @@
 ./src/atmos_spectral_barotropic/barotropic_dynamics.f90
 ./src/atmos_spectral_barotropic/barotropic_physics.f90
 ./src/atmos_spectral/driver/solo/atmosphere.f90
+./src/atmos_spectral/driver/solo/atmosphere.nick.f90
 ./src/atmos_spectral/driver/solo/atmosphere.surf0.f90
 ./src/atmos_spectral/driver/solo/atmosphere.surf1.f90
 ./src/atmos_spectral/init/spectral_init_cond.f90

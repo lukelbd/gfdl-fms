@@ -1,5 +1,5 @@
 #!/bin/bash
-usage="compile [spectral|bgrid|fv|shallow|barotropic]"
+usage="compile [-ho] [spectral|bgrid|shallow|barotropic]"
 doc="Compiles an executable for running a model from the GFDL Flexible
 Modelling System. Includes a spectral model, a B-grid model, a finite-volume
 model, a shallow-water model, anad a barotropic model.
@@ -7,29 +7,31 @@ model, a shallow-water model, anad a barotropic model.
 Usage
 
   $usage
+
+Options
+
+  -h|--help   Print this message.
+  -f|--force  Delete previously compiled source. Otherwise the Makefile
+              figures out the fewest files that need to be re-compiled
+              based on their last modified dates.
 "
-# Compiler flags
+# Move to this script's directory
 cwd=$(readlink -f ${0})
 cwd=${cwd%/*}
 cd $cwd
 source header.sh
+# Universal flags
 root=$cwd/../
-optimization='-O3'
-ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 cppdefs='-Duse_libMPI -Duse_netCDF'
+ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
-floatflags='-Ktrap=fp' # add =flag1,flag2,... for options; controls floating point exceptions; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
-ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl' # include netcdf libs
-mpflags='-Mmpi=mpich' # special 'pgflags', adds flags -L$MPILIB -lfmpich -lmpich; http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
-cppdefs='-Duse_libMPI -Duse_netCDF' # not sure what this does
 # Host-specific settings
+# Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags,
+# so use mpif90/mpiifort (identical) instead of ifort
+# Also use Intel MPI or openmpi instead of default mpt
+# See: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/running-jobs/intel-mpi-and-open-mpi
 case ${HOSTNAME%%.*} in
   cheyenne*)
-    # Basic libraries, with links to fortran compilers
-    # Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags,
-    # so use mpif90/mpiifort (identical) instead of ifort
-    # Also use Intel MPI or openmpi instead of default mpt
-    # See: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/running-jobs/intel-mpi-and-open-mpi
     module load intel &>/dev/null
     module load netcdf &>/dev/null
     module load impi &>/dev/null
@@ -43,22 +45,24 @@ case ${HOSTNAME%%.*} in
     include=/usr/include/mpich-x86_64
     fortran=pgf90
     cpp=pgcc
-    fflags='-Ktrap=fp' # see: http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
+    fpflags='-Ktrap=fp' # see: http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
     ldflags='-Mmpi=mpich'
   ;; euclid) # everything is bunched together
     include=/usr/local/include
     lib=/usr/local/lib
     fortran=pgf90
     cpp=pgcc
-    fflags='-Ktrap=fp'
+    fpflags='-Ktrap=fp'
     ldflags='-Mmpi=mpich'
   ;; *) raise "Unknown host, must configure library and binary locations before running." ;;
 esac
 
 # Parse input
+force=false
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) echo "$doc" && exit 0 ;;
+    -f|--force) force=true ;;
     -*) raise "Unknown argument \"$1\"." ;;
     *)
       [ -n "$model" ] && raise "Must specify just one model name."
@@ -75,24 +79,29 @@ mkmf=$root/bin/mkmf                            # path to executable mkmf
 mkmftemplate=$root/bin/mkmf.template           # template of most basic settings
 mppnsource=$root/postprocessing/mppnccombine.c # source code
 [ -d bin ] || mkdir bin
+cd bin # move to source directory
 [ -r $mppnsource ]   || raise "Could not find mppnccombine source code."
 [ -r $mkmftemplate ] || raise "Could not find Makefile template."
 [ -r $mkmf ]         || raise "Could not find Makefile-generating utility $mkmf."
 
 # Create mppnccombine
 # NOTE: Don't compile with mpi support, just runs it a bunch of times
-time=$(date +%s)
+t0=$(date +%s)
 echo "Generating mppnccombine executable..."
-$cpp -O -o bin/mppnccombine.x -L$lib -I$include $ncflags $mppnsource
+$cpp -O -o mppnccombine.x -L$lib -I$include $ncflags $mppnsource
+
+# Run make clean
+if $force && [ -r Makefile ]; then
+  make clean
+fi
 
 # Build makefile template (assumes pgi bin is on $PATH)
-cd bin # move to source directory
 cat > mkmf.template << DELIM
 CC = $cpp
 FC = $fortran
 LD = $fortran
 CPPFLAGS =
-FFLAGS = -r8 -pc 64 $fflags $optimization
+FFLAGS = -r8 -pc 64 $fpflags $optimization
 LDFLAGS = -L$lib $ncflags $ldflags
 LIST = -Mlist
 DELIM
@@ -109,5 +118,5 @@ echo "Compiling source code..."
 make -f Makefile
 [ $? -ne 0 ] && raise "Model compilation failed."
 cp *.x ../ 2>/dev/null
-echo "This script took $(($(date +%s) - $time)) seconds."
+echo "This script took $(($(date +%s) - $t0)) seconds."
 

@@ -200,27 +200,24 @@ return
 end subroutine read_namelist
 
 !------------------------------------------------------------------------------!
-! Author: Luke Davis (lukelbd@gmail.com)
-! See Polvani and Kushner (2002), GRL
-! * Retrieve level boundaries separated by s(i) = (i/N)**5 for some N, wherever
-!   the RHS is greater than 10**-5, then add boundary s = 0 at the top.
-! * Solve for N in the equation: s(N-i+1) = ((N-i+1)/N)**5 = 10**-5 
-!   where i = the number of boundaries above zero that we want (i.e. i=num_levels).
-!   Levels above s=0 will be defined from i=num_levels to i=1.
-! * Solution is N=floor(num_levels/0.9)
+! Author: Luke Davis (lukelbd@gmail.com). See: Polvani and Kushner (2002), GRL
+! Retrieve level boundaries separated by s(i) = (i/N)**5 for some N, wherever
+! the RHS is greater than 10**-5, then add boundary s = 0 at the top.........
+! PROBLEM: Solve N in the equation: s(N-i+1) = ((N-i+1)/N)**5 == 10**-5, where
+! i == number of boundaries above zero that *we want*, i.e. i == num_levels
+! Levels above s=0 will be defined from i=num_levels to i=1.
+! SOLUTION: N == floor(num_levels/0.9) = floor(num_levels*10/9)
 
 subroutine compute_pk_sigma (a, b)
 
 integer :: k, num_pk, num_levels
-real, intent (out), dimension(:) :: a, b
+real, intent(out), dimension(:) :: a, b
 
 num_levels = size(a,1)-1
 num_pk     = (num_levels * 10) / 9
 
-a    = 0.0 ! shorthand for assigning zero to all values
+a    = 0.0
 b(1) = 0.0 ! top always has zero pressure
-! do k = 2, num_levels+1
-!   b(k) = (float(k + num_pk - (num_levels + 1)) / float(num_pk)) ** 5
 do k = num_levels, 1, -1
   b(num_levels-k+2) = (float(num_pk-k+1) / float(num_pk)) ** 5
 end do

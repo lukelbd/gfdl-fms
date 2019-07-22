@@ -21,7 +21,7 @@ use spectral_initialize_fields_mod, only: spectral_initialize_fields
 
 use       topog_regularization_mod, only: compute_lambda, regularize
 
-use                 topography_mod, only: gaussian_topog_init, get_topog_mean, get_ocean_mask
+use                 topography_mod, only: sinusoidal_topog_init, gaussian_topog_init, get_topog_mean, get_ocean_mask
 
 implicit none
 private
@@ -210,7 +210,14 @@ else if(trim(topography_option) == 'gaussian') then
    call get_deg_lat(deg_lat)
    call gaussian_topog_init(deg_lon*pi/180, deg_lat*pi/180, surf_height)
    surf_geopotential = grav*surf_height
-else 
+
+else if (trim(topography_option) == 'sinusoidal') then
+  call get_deg_lon(deg_lon)
+  call get_deg_lat(deg_lat)
+  call sinusoidal_topog_init(deg_lon*pi/180., deg_lat*pi/180., surf_height)
+  surf_geopotential = grav*surf_height
+
+else
    call error_mesg('get_topography','"'//trim(topography_option)//'" is an invalid value for topography_option.', FATAL)
 endif
 

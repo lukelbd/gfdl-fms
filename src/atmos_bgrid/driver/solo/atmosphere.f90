@@ -33,7 +33,8 @@ use              fms_mod, only: file_exist, open_namelist_file, &
 use bgrid_change_grid_mod, only: change_grid, TEMP_GRID, WIND_GRID
 use bgrid_horiz_mod      , only: horiz_grid_type
 use bgrid_vert_mod       , only: vert_grid_type, &
-                                 compute_pres_full, compute_pres_half
+                                 compute_pres_full, compute_pres_half, &
+                                 compute_height
 use bgrid_halo_mod       , only: update_halo, UWND, VWND, TEMP, &
                                  NORTH, EAST, WEST, SOUTH
 use forcing_mod       , only: forcing_init, forcing
@@ -94,6 +95,8 @@ contains
    Time_next = Time + Time_step_atmos
 
 !---- dynamics -----
+! subroutine defined in bgrid_core_driver.f90, but it calls subroutine
+! update_bgrid_core defined in bgrid_core.f90
 
    call bgrid_core_driver ( Time_next, Var, Var_dt, Dynam, omega )
 
@@ -153,7 +156,11 @@ contains
 
 !----- initialize physics interface -----
 
-    call forcing_init ( atmos_axes, Time )
+    call forcing_init ( atmos_axes, &
+      Dynam%Hgrid%Tmp%is, Dynam%Hgrid%Tmp%ie,
+      Dynam%Hgrid%Tmp%js, Dynam%Hgrid%Tmp%je,
+      Dynam%Vgrid%nlev,
+      Time )
 
 !   ----- use entire grid as window ? -----
 
@@ -245,9 +252,9 @@ type   (prog_var_type),intent(inout) :: Var_dt
   integer :: ix, jx, idim, jdim
 !-----------------------------------------------------------------------
 
-   real, dimension(window(1),window(2),Vgrid%nlev) :: p_full, u_dt, v_dt
+   real, dimension(window(1),window(2),Vgrid%nlev) :: p_full, z_full, u_dt, v_dt
 
-   real, dimension(window(1),window(2),Vgrid%nlev+1) :: p_half
+   real, dimension(window(1),window(2),Vgrid%nlev+1) :: p_half, z_half
 
    real, dimension(Hgrid%ilb:Hgrid%iub, &
                    Hgrid%jlb:Hgrid%jub, &
@@ -292,6 +299,9 @@ type   (prog_var_type),intent(inout) :: Var_dt
        ix = ie-is+1
 
 !      ---- pass updated surface pressure ----
+!      also get updated geopotential height, 
+!      todo: add 'height' as possible diagnostic output, it currently is not!
+!      todo: test that this works!
        pssl_new(1:ix,1:jx) = Var%pssl(is:ie,js:je) + &
                              Var_dt%pssl(is:ie,js:je) * dt_phys
 
@@ -299,11 +309,15 @@ type   (prog_var_type),intent(inout) :: Var_dt
                                         p_full(1:ix,1:jx,:))
        call compute_pres_half (Vgrid, pssl_new(1:ix,1:jx), &
                                         p_half(1:ix,1:jx,:))
+       call compute_height (Vgrid, Dynam%fisl(is:ie,js:je,:), &
+                  Var%t(is:ie,js:je,:), Dynam%sphum(is:ie,js:je,:), &
+                  p_full(1:ix,1:jx,:), p_half(1:ix,1:jx,:), &
+                  z_full(1:ix,1:jx,:), z_half(1:ix,1:jx,:), &
+                  mask=Dynam%Masks%Tmp%mask(is:ie,js:je,:))
 
 
        u_dt(1:ix,1:jx,:) = uh_dt(is:ie,js:je,:)
        v_dt(1:ix,1:jx,:) = vh_dt(is:ie,js:je,:)
-
 
 !      ---- j-axis indices in the global physics grid ----
 
@@ -318,9 +332,11 @@ type   (prog_var_type),intent(inout) :: Var_dt
 !------------ eta coordinate -------------------------------------------
 
       call forcing ( i1, i2, j1, j2, dt_phys, Time ,&
+                            Hgrid%Tmp%alm(is:ie,js:je)    ,&
                             Hgrid%Tmp%aph(is:ie,js:je)    ,&
                             p_half   ( 1:ix, 1:jx,:)      ,&
                             p_full   ( 1:ix, 1:jx,:)      ,&
+                            z_full   ( 1:ix, 1:jx,:)      ,&
                             uh       (is:ie,js:je,:)      ,&
                             vh       (is:ie,js:je,:)      ,&
                             Var%t    (is:ie,js:je,:)      ,&
@@ -340,9 +356,11 @@ type   (prog_var_type),intent(inout) :: Var_dt
 !------------- sigma coordinate ----------------------------------------
 
       call forcing ( i1, i2, j1, j2, dt_phys, Time ,&
+                            Hgrid%Tmp%alm(is:ie,js:je)    ,&
                             Hgrid%Tmp%aph(is:ie,js:je)    ,&
                             p_half   ( 1:ix, 1:jx,:)      ,&
                             p_full   ( 1:ix, 1:jx,:)      ,&
+                            z_full   ( 1:ix, 1:jx,:)      ,&
                             uh       (is:ie,js:je,:)      ,&
                             vh       (is:ie,js:je,:)      ,&
                             Var%t    (is:ie,js:je,:)      ,&

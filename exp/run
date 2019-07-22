@@ -133,7 +133,7 @@ copy_restart() {
   if ! [ -d "$rdir" ] || ! [ -d "$rdir/RESTART" ] \
     || [ -z "$(ls $rdir/RESTART/*.nc 2>/dev/null)" ] \
     || ! [ -r "$rdir/RESTART/atmos_model.res" ]; then
-    raise "Restart directory $rdir/RESTART does not exist, or is empty."
+    raise "Restart directory $rdir/RESTART does not exist, or is missing atmos_model.res and/or the restart NetCDF files."
   fi
   echo "Moving restart files from ${rdir##*/}/RESTART to ${PWD##*/}/INPUT..."
   for file in $rdir/RESTART/*; do
@@ -207,6 +207,7 @@ dir_setup() {
   cp $model . # move executable inside (declared at top of file)
   mkdir RESTART # model spits out stuff here, can be accepted as input to new iteration
   mkdir INPUT   # model reads from this
+  mkdir DATA    # for realistic Earth topography, see topography.html
   touch field_table # just put empty file, if want no tracers
 
   # Copy existing namelist file over
@@ -218,10 +219,17 @@ dir_setup() {
   cp $expdir/input.nml ./
   cp $expdir/diag_table ./
   cp $expdir/field_table ./
+
+  # Input files
+  heat=$(nml_parse input.nml input_heating)
   topo=$(nml_parse input.nml topography_option) # use helper function
   if [ "$topo" == "input" ]; then
-    [ -r $expdir/topography.data.nc ] || raise "Topography file not available."
+    [ -r $expdir/topography.data.nc ] || raise "Topography file \"$expdir/topography.data.nc\" not found."
     cp $expdir/topography.data.nc INPUT/
+  fi
+  if [ "$heat" == ".true." ]; then
+    [ -r $expdir/heating.data.nc ] || raise "Heating file \"$expdir/heating.data.nc\" not found."
+    cp $expdir/heating.data.nc INPUT/
   fi
 
   # Namelist changes for spindown runs

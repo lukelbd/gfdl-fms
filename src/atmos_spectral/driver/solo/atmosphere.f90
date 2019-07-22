@@ -6,7 +6,7 @@ use                  fms_mod, only: set_domain, write_version_number, field_size
 use            constants_mod, only: grav, pi
 
 use           transforms_mod, only: trans_grid_to_spherical, trans_spherical_to_grid, &
-                                    get_deg_lat, get_grid_boundaries, grid_domain,    &
+                                    get_deg_lon, get_deg_lat, get_grid_boundaries, grid_domain, &
                                     spectral_domain, get_grid_domain, get_lon_max, get_lat_max
 
 use         time_manager_mod, only: time_type, set_time, get_time, &
@@ -59,8 +59,8 @@ real, allocatable, dimension(:,:    ) :: dt_psg
 real, allocatable, dimension(:,:,:  ) :: dt_ug, dt_vg, dt_tg
 real, allocatable, dimension(:,:,:,:) :: dt_tracers
 
-real, allocatable, dimension(:)   :: deg_lat, rad_lat
-real, allocatable, dimension(:,:) :: rad_lat_2d
+real, allocatable, dimension(:)   :: deg_lat, rad_lat, deg_lon
+real, allocatable, dimension(:,:) :: rad_lat_2d, rad_lon_2d
 
 integer :: previous, current, future
 logical :: module_is_initialized =.false.
@@ -80,7 +80,7 @@ subroutine atmosphere_init(Time_init, Time, Time_step_in)
 
 type (time_type), intent(in)  :: Time_init, Time, Time_step_in
 
-integer :: seconds, days, lon_max, lat_max, ntr, nt, j
+integer :: seconds, days, lon_max, lat_max, ntr, nt, i, j
 integer, dimension(4) :: siz
 real, dimension(2) :: time_pointers
 character(len=64) :: file, tr_name
@@ -121,6 +121,8 @@ allocate (dt_tracers (is:ie, js:je, num_levels, num_tracers))
 allocate (deg_lat    (       js:je))
 allocate (rad_lat    (       js:je))
 allocate (rad_lat_2d (is:ie, js:je))
+allocate (deg_lon    (is:ie       ))
+allocate (rad_lon_2d (is:ie, js:je))
 
 p_half = 0.; z_half = 0.; p_full = 0.; z_full = 0.
 wg_full = 0.; psg = 0.; ug = 0.; vg = 0.; tg = 0.; grid_tracers = 0.
@@ -170,7 +172,12 @@ do j=js,je
   rad_lat_2d(:,j) = deg_lat(j)*pi/180.
 enddo
 
-call forcing_init(get_axis_id(), Time)
+call get_deg_lon(deg_lon)
+do i=is, ie
+  rad_lon_2d(i,:) = deg_lon(i)*pi/180.
+enddo
+
+call forcing_init(get_axis_id(), is, ie, js, je, num_levels, Time)
 
 module_is_initialized = .true.
 
@@ -203,8 +210,10 @@ endif
 
 Time_next = Time + Time_step
 
-call forcing(1, ie-is+1, 1, je-js+1, delta_t, Time_next, rad_lat_2d(:,:), &
+call forcing(1, ie-is+1, 1, je-js+1, delta_t, Time_next, &
+            rad_lon_2d(:,:),              rad_lat_2d(:,:),              &
                 p_half(:,:,:         ),       p_full(:,:,:           ), &
+                z_full(:,:,:         ),                                 &
                     ug(:,:,:,previous),           vg(:,:,:,previous  ), &
                     tg(:,:,:,previous), grid_tracers(:,:,:,previous,:), &
                     ug(:,:,:,previous),           vg(:,:,:,previous  ), &

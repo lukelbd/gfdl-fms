@@ -4,7 +4,7 @@
 tags
 tests
 trash
-run/bin*
+exp/bin*
 
 # VIM extras #
 ##############

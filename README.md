@@ -14,7 +14,7 @@ Various features were added to the model, described in detail below and in the n
 ## Documentation
 The full, original model documentation is published on [github-pages](https://lukelbd.github.io/gfdl-fms). Use the links at the top of each page to navigate between sections! Below are some important notes regarding the documentation.
 
-* [bgrid.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [spectral_core.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [shallow.pdf](https://lukelbd.github.io/gfdl-fms/doc/shallow.pdf), [barotropic.pdf](https://lukelbd.github.io/gfdl-fms/doc/barotropic.pdf), contain background information on the model physical equations.
+* [bgrid.pdf](https://lukelbd.github.io/gfdl-fms/doc/bgrid.pdf), [spectral_core.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral_core.pdf), [shallow.pdf](https://lukelbd.github.io/gfdl-fms/doc/shallow.pdf), [barotropic.pdf](https://lukelbd.github.io/gfdl-fms/doc/barotropic.pdf), contain background information on the model physical equations.
 * [diag_table](exp/diag_table) is a template "diagnostic table". It specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in the [diag_table](exp/diag_table) comments. Full lists of diagnostic table parameters are found on the following pages.
     * [spectral_dynamics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral/model/spectral_dynamics.html)
     * [bgrid_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_bgrid/tools/bgrid_diagnostics.html)

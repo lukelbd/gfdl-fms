@@ -15,13 +15,13 @@ Various features were added to the model, described in detail below and in the n
 The full, original model documentation is published on [github-pages](https://lukelbd.github.io/gfdl-fms). Use the links at the top of each page to navigate between sections! Below are some important notes regarding the documentation.
 
 * [bgrid.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [spectral_core.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [shallow.pdf](https://lukelbd.github.io/gfdl-fms/doc/shallow.pdf), [barotropic.pdf](https://lukelbd.github.io/gfdl-fms/doc/barotropic.pdf), contain background information on the model physical equations.
-* [diag_table](run/diag_table) is a template "diagnostic table". It specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in comments. Full lists of diagnostic table parameters are found on the following pages.
+* [diag_table](exp/diag_table) is a template "diagnostic table". It specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in the [diag_table](exp/diag_table) comments. Full lists of diagnostic table parameters are found on the following pages.
     * [spectral_dynamics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral/model/spectral_dynamics.html)
     * [bgrid_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_bgrid/tools/bgrid_diagnostics.html)
     * [forcing.html](https://lukelbd.github.io/gfdl-fms/src/atmos_param/forcing/forcing.html)
     * [barotropic_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_barotropic/barotropic_diagnostics.html)
     * [shallow_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_shallow/shallow_diagnostics.html)
-* [input.nml](run/input.nml) is a template namelist file. It allows you to specify various model settings and forcing parameters at run-time, rather than compile-time. Descriptions of each parameter are indicated in comments. Full lists of namelist parameters are found on the following pages:
+* [input.nml](exp/input.nml) is a template namelist file. It allows you to specify various model settings and forcing parameters at run-time, rather than compile-time. Brief descriptions of each parameter are found in the [input.nml](exp/input.nml) comments. Full tables and descriptions of namelist parameters are found on the following pages:
     * [shallow_dynamics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_shallow/shallow_dynamics.html)
     * [shallow_physics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_shallow/shallow_physics.html)
     * [atmosphere.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_shallow/atmosphere.html)

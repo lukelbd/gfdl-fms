@@ -12,7 +12,7 @@ Various features were added to the model, described in detail below and in the n
 * [idealized_topog.f90](src/shared/topography/idealized_topog.f90) adds a new sinusoidal topography option, configurable with the `&idealized_topog_nml` namelist.
 
 ## Documentation
-The full, original model documentation is published on [github-pages](https://lukelbd.github.io/gfdl-fms). Further documentation is described below.
+The full, original model documentation is published on [github-pages](https://lukelbd.github.io/gfdl-fms). Use the links at the top of each page to navigate between sections! Below are some important notes regarding the documentation.
 
 * [bgrid.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [spectral_core.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral.pdf), [shallow.pdf](https://lukelbd.github.io/gfdl-fms/doc/shallow.pdf), [barotropic.pdf](https://lukelbd.github.io/gfdl-fms/doc/barotropic.pdf), contain background information on the model physical equations.
 * [diag_table](run/diag_table) is a template "diagnostic table". It specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in comments. Full lists of diagnostic table parameters are found on the following pages.
@@ -31,9 +31,7 @@ The full, original model documentation is published on [github-pages](https://lu
     * [atmosphere.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_barotropic/atmosphere.html)
     * [shallow_physics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_param/shallow_physics/shallow_physics.html)
     * [forcing.html](https://lukelbd.github.io/gfdl-fms/src/atmos_param/forcing/forcing.html)
-    * [time_interp_external.F90](https://lukelbd.github.io/gfdl-fms/src/shared/time_interp/time_interp_external.F90)
     * [fms.html](https://lukelbd.github.io/gfdl-fms/src/shared/fms/fms.html)
-    * [fms_io.F90](https://lukelbd.github.io/gfdl-fms/src/shared/fms/fms_io.F90)
     * [horiz_interp_spherical.html](https://lukelbd.github.io/gfdl-fms/src/shared/horiz_interp/horiz_interp_spherical.html)
     * [diag_manager.html](https://lukelbd.github.io/gfdl-fms/src/shared/diag_manager/diag_manager.html)
     * [topography.html](https://lukelbd.github.io/gfdl-fms/src/shared/topography/topography.html)

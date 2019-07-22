@@ -27,18 +27,18 @@ Run mode spec
 
 Optional arguments
 
-  -h|--help                 Print this message.
-  -n|--new                  Exit if experiment folder already exists.
-  -i|--init                 Exit after saving the 'forcing.nc' forcing data.
-  -f|--fix                  Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
-  -r|--resume               Resume model run from last block in the experiment directory. Use this to continue interrupted runs.
-  [-c|--cores]=*            The number of cores to parallelize over.
-  [-p|--process]=*          Path to the processing script. Defaults to the includes './process' file.
-  [-pf|--process-forcing]=* Path to processing script for forcing run.
-  [-ts|--tstart]=*          The initial day. Can use this to continue from another run.
-  [-te|--tend]=*            The final day.
-  [-rd|--restart]=*         The initial restart directory.
-  [-tsp|--tspindown]=*      Comma-separated list of initial spindown days.
+  -h|--help               Print this message.
+  -n|--new                Exit if experiment folder already exists.
+  -i|--init               Exit after saving the 'constants.nc' data.
+  -f|--fix                Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
+  -r|--resume             Resume model run from last block in the experiment directory. Use this to continue interrupted runs.
+  [-c|--cores]=*          The number of cores to parallelize over.
+  [-p|--process]=*        Path to the processing script. Defaults to the includes './process' file.
+  [-pi|--process-init]=*  Path to processing script for forcing run.
+  [-ts|--tstart]=*        The initial day. Can use this to continue from another run.
+  [-te|--tend]=*          The final day.
+  [-rd|--restart]=*       The initial restart directory.
+  [-tsp|--tspindown]=*    Comma-separated list of initial spindown days.
 "
 # Initial stuff
 sdir=$(readlink -f ${0})
@@ -69,7 +69,7 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
     -m=*|--mode=*) mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
     -c=*|--cores=*) cores=${1#*=} ;;
     -p=*|--process=*) pinline=${1#*=} ;; # name of the process script
-    -pf=*|--process-forcing=*) pforcing=${1#*=} ;; # name of the process script
+    -pi=*|--process-init=*) pinit=${1#*=} ;; # name of the process script
     -rd=*|--restart=*) rinit=${1#*=} ;; # manual override restart directory
     -ts=*|--tstart=*) tstart=${1#*=} ;; # use this to continue from *particular* day of existing run
     -te=*|--tend=*) tend=${1#*=} ;; # ending day
@@ -105,9 +105,9 @@ which realpath &>/dev/null || raise "This script requires the 'realpath' command
 [ -z "$pinline" ] && pinline=$sdir/process
 [ -x "$pinline" ] || raise "Processing script $pinline not found or is not executable."
 pinline=$(realpath $pinline)
-if [ -n "$pforcing" ]; then
-  [ -x "$pforcing" ] || raise "Forcing processing script $pforcing not found or is not executable."
-  pforcing=$(realpath $pforcing)
+if [ -n "$pinit" ]; then
+  [ -x "$pinit" ] || raise "Initial processing script $pinit not found or is not executable."
+  pinit=$(realpath $pinit)
 fi
 # Restart directory
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
@@ -282,36 +282,37 @@ run_model() {
 }
 
 ################################################################################
-# Run model for a second to get the *unchanging* forcing params, i.e. teq,
+# Run model for a second to get the *unchanging* params, i.e. zsurf, teq,
 # kdamp, kfric, and ksponge.
 ################################################################################
 [ -r $expdir/input.nml ] || raise "$expdir/input.nml not found."
-[ -d $expdir/forcing ] || mkdir $expdir/forcing
+[ -d $expdir/constants ] || mkdir $expdir/constants
 # Set up directory
-dir_setup 0 $expdir/forcing
-nml_replace $expdir/forcing/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
-cat >$expdir/forcing/diag_table <<EOF
+dir_setup 0 $expdir/constants
+nml_replace $expdir/constants/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
+cat >$expdir/constants/diag_table <<EOF
 "Forcing scheme for dry core experiments"
 0 0 0 0 0 0
 # Filename
-"forcing", 1, "seconds", 1, "days", "time",
+"constants", 1, "seconds", 1, "days", "time",
 # Parameters
-"dynamics", "slp",        "slp",        "forcing", "all", .false., "none", 2,
-"dynamics", "height",     "z",          "forcing", "all", .false., "none", 2,
-"dynamics", "bk",         "hybi",       "forcing", "all", .false., "none", 2,
-"dynamics", "pk",         "hyai",       "forcing", "all", .false., "none", 2,
-"forcing",  "teq",        "teq",        "forcing", "all", .false., "none", 2,
-"forcing",  "forcing",    "forcing",    "forcing", "all", .false., "none", 2,
-"forcing",  "ndamp",      "ndamp",      "forcing", "all", .false., "none", 2,
-"forcing",  "rdamp",      "rdamp",      "forcing", "all", .false., "none", 2,
-"forcing",  "ndamp_mean", "ndamp_mean", "forcing", "all", .false., "none", 2,
-"forcing",  "ndamp_anom", "ndamp_anom", "forcing", "all", .false., "none", 2,
-"forcing",  "rdamp_mean", "rdamp_mean", "forcing", "all", .false., "none", 2,
-"forcing",  "rdamp_anom", "rdamp_anom", "forcing", "all", .false., "none", 2,
+"dynamics", "ps",         "ps",         "constants", "all", .false., "none", 2,
+"dynamics", "surf",       "surf",       "constants", "all", .false., "none", 2,
+"dynamics", "bk",         "hybi",       "constants", "all", .false., "none", 2,
+"dynamics", "pk",         "hyai",       "constants", "all", .false., "none", 2,
+"forcing",  "teq",        "teq",        "constants", "all", .false., "none", 2,
+"forcing",  "ndamp",      "ndamp",      "constants", "all", .false., "none", 2,
+"forcing",  "rdamp",      "rdamp",      "constants", "all", .false., "none", 2,
+"forcing",  "sdamp",      "sdamp",      "constants", "all", .false., "none", 2,
+"forcing",  "forcing",    "forcing",    "constants", "all", .false., "none", 2,
+"forcing",  "ndamp_mean", "ndamp_mean", "constants", "all", .false., "none", 2,
+"forcing",  "ndamp_anom", "ndamp_anom", "constants", "all", .false., "none", 2,
+"forcing",  "rdamp_mean", "rdamp_mean", "constants", "all", .false., "none", 2,
+"forcing",  "rdamp_anom", "rdamp_anom", "constants", "all", .false., "none", 2,
 EOF
 # Run model
 echo "Getting forcing data..."
-run_model 0 1 $pforcing || raise "Forcing run failed. Check log files in the forcing folder."
+run_model 0 1 $pinit || raise "Forcing run failed. Check log files in the forcing folder."
 $init && exit 0
 
 ##############################################################################

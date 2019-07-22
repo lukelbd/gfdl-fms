@@ -1,5 +1,5 @@
 #!/bin/bash
-usage="compile [-ho] [spectral|bgrid|shallow|barotropic]"
+usage="compile [-hf] [spectral|bgrid|shallow|barotropic]"
 doc="Compiles an executable for running a model from the GFDL Flexible
 Modelling System. Includes a spectral model, a B-grid model, a finite-volume
 model, a shallow-water model, anad a barotropic model.

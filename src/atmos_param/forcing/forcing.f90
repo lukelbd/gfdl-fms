@@ -108,7 +108,7 @@ character(len=128) :: tagname='$Name: latest $'
 real :: trdamp
 real, dimension(2) :: tktrop, tkbl, tkstrat, tkmeso, vkfric, vksponge
 integer :: id_forcing, id_teq, &
-  id_ndamp, id_rdamp, id_tdt, id_udt, id_vdt, &
+  id_ndamp, id_rdamp, id_sdamp, id_tdt, id_udt, id_vdt, &
   id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
   id_tdt_mean, id_tdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
   id_tdt_diss, id_heat_diss, &
@@ -137,7 +137,7 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
   !-----------------------------------------------------------------------
   real, dimension(size(t,1),size(t,2))             :: ps, diss_heat
   real, dimension(size(t,1),size(t,2),size(t,3))   :: sigma, pmass ! sigma and mass
-  real, dimension(size(t,1),size(t,2),size(t,3))   :: udt_sponge, vdt_sponge
+  real, dimension(size(t,1),size(t,2),size(t,3))   :: udt_sponge, vdt_sponge, sdamp
   real, dimension(size(t,1),size(t,2),size(t,3))   :: teq, tdt_force, tdt_diss, udt_diss, vdt_diss
   real, dimension(size(r,1),size(r,2),size(r,3))   :: rst, rtnd
   real, dimension(size(t,1),size(t,2),size(t,3),2) :: tdt_damp, tdamp, udt_damp, vdt_damp, rdamp
@@ -165,19 +165,30 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
   enddo
 
   !     Rayleigh damping of wind components near the surface
-  !     Sponge layer damping of wind components at the top
   udt_damp = 0.0
   vdt_damp = 0.0
   call friction_damping ( sigma, u, v, udt_damp, vdt_damp, rdamp, mask=mask )
+  if (id_udt   > 0) used = send_data(id_udt,   sum(udt_damp,4),   Time, is, js)
+  if (id_vdt   > 0) used = send_data(id_vdt,   sum(vdt_damp,4),   Time, is, js)
+  if (id_rdamp > 0) used = send_data(id_rdamp, rdamp(:,:,:,1), Time, is, js)
+  if (rdamp_decomp) then
+    if (id_udt_mean   > 0) used = send_data(id_udt_mean,   udt_damp(:,:,:,1), Time, is, js)
+    if (id_udt_anom   > 0) used = send_data(id_udt_anom,   udt_damp(:,:,:,2), Time, is, js)
+    if (id_vdt_mean   > 0) used = send_data(id_vdt_mean,   vdt_damp(:,:,:,1), Time, is, js)
+    if (id_vdt_anom   > 0) used = send_data(id_vdt_anom,   vdt_damp(:,:,:,2), Time, is, js)
+    if (id_rdamp_mean > 0) used = send_data(id_rdamp_mean, rdamp(:,:,:,1), Time, is, js)
+    if (id_rdamp_anom > 0) used = send_data(id_rdamp_anom, rdamp(:,:,:,2), Time, is, js)
+  endif
 
+
+  !     Sponge layer damping of wind components at the top
   udt_sponge = 0.0
   vdt_sponge = 0.0
   if (strat_sponge) then
-    ! Apply sponge damping
-    call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, mask=mask )
-    ! Diagnostic output
-    if (id_udt_sponge  > 0) used = send_data(id_udt_sponge, udt_sponge, Time, is, js)
-    if (id_vdt_sponge  > 0) used = send_data(id_vdt_sponge, vdt_sponge, Time, is, js)
+    call sponge_damping ( p_full, u, v, udt_sponge, vdt_sponge, sdamp, mask=mask )
+    if (id_udt_sponge > 0) used = send_data(id_udt_sponge, udt_sponge, Time, is, js)
+    if (id_vdt_sponge > 0) used = send_data(id_vdt_sponge, vdt_sponge, Time, is, js)
+    if (id_sdamp > 0) used = send_data(id_sdamp, sdamp, Time, is, js)
   endif
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
@@ -188,17 +199,37 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
   else
     call thermal_damping ( lat, sigma, p_full, z_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
+  if (id_teq    > 0) used = send_data(id_teq,        teq,               Time, is, js)
+  if (id_tdt    > 0) used = send_data(id_tdt,        sum(tdt_damp,4),   Time, is, js)
+  if (id_ndamp  > 0) used = send_data(id_ndamp,      tdamp(:,:,:,1),    Time, is, js)
+  if (ndamp_decomp) then
+    if (id_tdt_mean   > 0) used = send_data(id_tdt_mean,   tdt_damp(:,:,:,1), Time, is, js)
+    if (id_tdt_anom   > 0) used = send_data(id_tdt_anom,   tdt_damp(:,:,:,2), Time, is, js)
+    if (id_ndamp_mean > 0) used = send_data(id_ndamp_mean, tdamp(:,:,:,1),    Time, is, js)
+    if (id_ndamp_anom > 0) used = send_data(id_ndamp_anom, tdamp(:,:,:,2),    Time, is, js)
+  endif
+
+  ! Energy conservation
+  tdt_diss = 0.0
+  if (conserve_energy) then
+    ! Apply tempreature tendency due to kinetic energy dissipation
+    udt_diss = sum(udt_damp,4)
+    vdt_diss = sum(vdt_damp,4)
+    tdt_diss = -((um + 0.5*udt_diss*dt)*udt_diss + (vm + 0.5*vdt_diss*dt)*vdt_diss)/cp_air
+    ! Diagnostic output
+    if (id_tdt_diss  > 0) used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
+    if (id_heat_diss > 0) then
+      pmass = p_half(:,:,2:) - p_half(:,:,:size(p_half,3)-1)
+      diss_heat = cp_air/grav * sum( tdt_diss*pmass, 3)
+      used = send_data(id_heat_diss, diss_heat, Time, is, js)
+    endif
+  endif
 
   !     Butler et al. (2010) radiative forcing and other forcing
   !     Lindgren et al. (2018) wave heating
   !     Dissipative heating to conserve energy
+  ! Heating terms
   tdt_force = 0.0
-  if ((q0_arctic .ne. 0) .or. (q0_tropical .ne. 0) .or. (q0_vortex .ne. 0)) then
-    call butler_heating ( lat, sigma, tdt_force )
-  endif
-  if (q0_lsp .ne. 0) then
-    call lsp_heating( lon, lat, sigma, tdt_force )
-  endif
   if (q0_global .ne. 0) then ! global constant heating
     tdt_force = tdt_force + q0_global / seconds_per_day
   endif
@@ -207,54 +238,21 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
       tdt_force = tdt_force + q0_surface * ((sigma - sigma_b) / (1 - sigma_b)) / seconds_per_day
     endwhere
   endif
+  if ((q0_arctic .ne. 0) .or. (q0_tropical .ne. 0) .or. (q0_vortex .ne. 0)) then
+    call butler_heating ( lat, sigma, tdt_force )
+  endif
+  if (q0_lsp .ne. 0) then
+    call lsp_heating( lon, lat, sigma, tdt_force )
+  endif
   if (present(mask)) then
     tdt_force = mask * tdt_force
   endif
+  if (id_forcing > 0) used = send_data(id_forcing, tdt_force, Time, is, js)
 
-  tdt_diss = 0.0
-  if (conserve_energy) then
-    ! Apply tempreature tendency due to kinetic energy dissipation
-    udt_diss = sum(udt_damp,4)
-    vdt_diss = sum(vdt_damp,4)
-    tdt_diss = -((um + 0.5*udt_diss*dt)*udt_diss + (vm + 0.5*vdt_diss*dt)*vdt_diss)/cp_air
-    ! Diagnostic output
-    if (id_tdt_diss  > 0) then
-      used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
-    endif
-    if (id_heat_diss > 0) then
-      pmass = p_half(:,:,2:) - p_half(:,:,:size(p_half,3)-1)
-      diss_heat = cp_air/grav * sum( tdt_diss*pmass, 3)
-      used = send_data(id_heat_diss, diss_heat, Time, is, js)
-    endif
-  endif
-
-  !     Apply forced wind and temperature tendencies, send data
+  !     Apply forced wind and temperature tendencies
   udt = udt + udt_damp(:,:,:,1) + udt_damp(:,:,:,2) + udt_sponge
   vdt = vdt + vdt_damp(:,:,:,1) + vdt_damp(:,:,:,2) + vdt_sponge
-
-  if (id_udt        > 0) used = send_data(id_udt,        sum(udt_damp,4),   Time, is, js)
-  if (id_udt_mean   > 0) used = send_data(id_udt_mean,   udt_damp(:,:,:,1), Time, is, js)
-  if (id_udt_anom   > 0) used = send_data(id_udt_anom,   udt_damp(:,:,:,2), Time, is, js)
-  if (id_vdt        > 0) used = send_data(id_vdt,        sum(vdt_damp,4),   Time, is, js)
-  if (id_vdt_mean   > 0) used = send_data(id_vdt_mean,   vdt_damp(:,:,:,1), Time, is, js)
-  if (id_vdt_anom   > 0) used = send_data(id_vdt_anom,   vdt_damp(:,:,:,2), Time, is, js)
-
-  if (id_rdamp      > 0) used = send_data(id_rdamp,      rdamp(:,:,:,1), Time, is, js)
-  if (id_rdamp_mean > 0) used = send_data(id_rdamp_mean, rdamp(:,:,:,1), Time, is, js)
-  if (id_rdamp_anom > 0) used = send_data(id_rdamp_anom, rdamp(:,:,:,2), Time, is, js)
-
   tdt = tdt + tdt_damp(:,:,:,1) + tdt_damp(:,:,:,2) + tdt_force + tdt_diss ! mean and anomaly components
-
-  if (id_forcing    > 0) used = send_data(id_forcing,    tdt_force,         Time, is, js)
-
-  if (id_teq        > 0) used = send_data(id_teq,        teq,               Time, is, js)
-  if (id_tdt        > 0) used = send_data(id_tdt,        sum(tdt_damp,4),   Time, is, js)
-  if (id_tdt_mean   > 0) used = send_data(id_tdt_mean,   tdt_damp(:,:,:,1), Time, is, js)
-  if (id_tdt_anom   > 0) used = send_data(id_tdt_anom,   tdt_damp(:,:,:,2), Time, is, js)
-
-  if (id_ndamp      > 0) used = send_data(id_ndamp,      tdamp(:,:,:,1),    Time, is, js)
-  if (id_ndamp_mean > 0) used = send_data(id_ndamp_mean, tdamp(:,:,:,1),    Time, is, js)
-  if (id_ndamp_anom > 0) used = send_data(id_ndamp_anom, tdamp(:,:,:,2),    Time, is, js)
 
   !     Tracers
   call get_number_tracers(MODEL_ATMOS, num_tracers=num_tracers)
@@ -540,13 +538,19 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   endif
 
   ! Rate of wind change by sponge
-  id_udt_sponge = register_diag_field ( mod_name, 'udt_sponge', axes(1:3), Time, &
-    'sponge zonal wind damping', 'm/s2',       &
-    missing_value=missing_value     )
+  if (strat_sponge) then
+    id_udt_sponge = register_diag_field ( mod_name, 'udt_sponge', axes(1:3), Time, &
+      'sponge zonal wind damping', 'm/s2',       &
+      missing_value=missing_value     )
 
-  id_vdt_sponge = register_diag_field ( mod_name, 'vdt_sponge', axes(1:3), Time, &
-    'sponge meridional wind damping', 'm/s2',       &
-    missing_value=missing_value     )
+    id_vdt_sponge = register_diag_field ( mod_name, 'vdt_sponge', axes(1:3), Time, &
+      'sponge meridional wind damping', 'm/s2',       &
+      missing_value=missing_value     )
+
+    id_sdamp = register_diag_field ( mod_name, 'sdamp', axes(1:3), Time, &
+      'sponge damping coefficient', 'sec-1', &
+      missing_value=missing_value )
+  endif
 
   module_is_initialized  = .true.
 
@@ -976,7 +980,7 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
 
 end subroutine friction_damping
 
-subroutine sponge_damping ( p_full, u, v, uspg, vspg, mask )
+subroutine sponge_damping ( p_full, u, v, uspg, vspg, sdamp, mask )
 
   !-----------------------------------------------------------------------
   !
@@ -984,7 +988,7 @@ subroutine sponge_damping ( p_full, u, v, uspg, vspg, mask )
   !
   !-----------------------------------------------------------------------
   real, intent(in),  dimension(:,:,:) :: p_full, u, v
-  real, intent(out), dimension(:,:,:) :: uspg, vspg
+  real, intent(out), dimension(:,:,:) :: uspg, vspg, sdamp
   real, intent(in),  dimension(:,:,:), optional :: mask
   !-----------------------------------------------------------------------
   real, dimension(size(u,1),size(u,2)) :: sp_fact, spcoeff, ksp
@@ -992,8 +996,8 @@ subroutine sponge_damping ( p_full, u, v, uspg, vspg, mask )
   integer :: i, j, k
   !-----------------------------------------------------------------------
 
-  p_sp   = p_sponge * 100.0
-  ksp    = -vksponge(1) ! for time being, no option to separate mean/anomaly sponge damping
+  p_sp = p_sponge * 100.0
+  ksp  = -vksponge(1) ! for time being, no option to separate mean/anomaly sponge damping
 
   do k = 1, size(u,3)
     where (p_full(:,:,k) .lt. p_sp)
@@ -1001,6 +1005,7 @@ subroutine sponge_damping ( p_full, u, v, uspg, vspg, mask )
       spcoeff = ksp*sp_fact*sp_fact
       uspg(:,:,k)  = spcoeff*u(:,:,k) 
       vspg(:,:,k)  = spcoeff*v(:,:,k)
+      sdamp(:,:,k) = spcoeff
     elsewhere
       uspg(:,:,k)  = 0.0
       vspg(:,:,k)  = 0.0

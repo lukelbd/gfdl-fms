@@ -193,15 +193,15 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
+  tdt_damp = 0.0
   if (locked_heating) then
     tdt_damp(:,:,:,1) = tdt_locked(:,:,:)
-    tdt_damp(:,:,:,2) = 0.0
   else
     call thermal_damping ( lat, sigma, p_full, z_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
-  if (id_teq    > 0) used = send_data(id_teq,        teq,               Time, is, js)
-  if (id_tdt    > 0) used = send_data(id_tdt,        sum(tdt_damp,4),   Time, is, js)
-  if (id_ndamp  > 0) used = send_data(id_ndamp,      tdamp(:,:,:,1),    Time, is, js)
+  if (id_teq   > 0) used = send_data(id_teq,   teq,             Time, is, js)
+  if (id_tdt   > 0) used = send_data(id_tdt,   sum(tdt_damp,4), Time, is, js)
+  if (id_ndamp > 0) used = send_data(id_ndamp, tdamp(:,:,:,1),  Time, is, js)
   if (ndamp_decomp) then
     if (id_tdt_mean   > 0) used = send_data(id_tdt_mean,   tdt_damp(:,:,:,1), Time, is, js)
     if (id_tdt_anom   > 0) used = send_data(id_tdt_anom,   tdt_damp(:,:,:,2), Time, is, js)
@@ -220,7 +220,7 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
     if (id_tdt_diss  > 0) used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
     if (id_heat_diss > 0) then
       pmass = p_half(:,:,2:) - p_half(:,:,:size(p_half,3)-1)
-      diss_heat = cp_air/grav * sum( tdt_diss*pmass, 3)
+      diss_heat = cp_air/grav * sum(tdt_diss*pmass, 3)
       used = send_data(id_heat_diss, diss_heat, Time, is, js)
     endif
   endif
@@ -862,9 +862,9 @@ subroutine butler_heating ( x, y, tdt )
     !     ----- Tropical forcing, mimics lapse rate feedback -----
     if (q0_tropical .ne. 0) then
       tdt(:,:,k) = tdt(:,:,k) + q0_tropical*exp( &
-          -((x(:,:)   - x0_tropical)**2/(2*sx_tropical**2) + &
-            (y(:,:,k) - y0_tropical)**2/(2*sy_tropical**2)) &
-            ) / seconds_per_day
+         -((x(:,:)   - x0_tropical)**2/(2*sx_tropical**2) + &
+           (y(:,:,k) - y0_tropical)**2/(2*sy_tropical**2)) &
+           ) / seconds_per_day
     endif
 
     !     ----- Polar vortex forcing, mimics ozone depletion -----
@@ -880,8 +880,8 @@ subroutine butler_heating ( x, y, tdt )
     if (q0_arctic .ne. 0) then
       where (x .gt. 0)
         tdt(:,:,k) = tdt(:,:,k) + q0_arctic &
-              * cos(x - x0_arctic)**15 * exp(6*(y(:,:,k) - y0_arctic)) &
-              / seconds_per_day
+          * cos(x - x0_arctic)**15 * exp(6*(y(:,:,k) - y0_arctic)) &
+          / seconds_per_day
       endwhere
     endif
   enddo
@@ -910,7 +910,9 @@ subroutine lsp_heating ( lon, lat, p_full, tdt )
   ptop = pt_lsp*100.0
   do k=1,size(tdt,3)
     where ((p_full(:,:,k) <= pbot) .and. (p_full(:,:,k) >= ptop))
-      tdt(:,:,k) = tdt(:,:,k) + q0_lsp * sin(m_lsp*lon(:,:))*exp(-0.5*((lat - phi0_lsp)/sphi_lsp)**2)*sin(pi*log(p_full(:,:,k)/pbot)/log(ptop/pbot))
+      tdt(:,:,k) = tdt(:,:,k) + &
+        q0_lsp * sin(m_lsp*lon(:,:))*exp(-0.5*((lat - phi0_lsp)/sphi_lsp)**2)*sin(pi*log(p_full(:,:,k)/pbot)/log(ptop/pbot)) &
+        / seconds_per_day
     endwhere 
   enddo
 

@@ -2,8 +2,7 @@
 0 0 0 0 0 0
 # Diagnostic table, describes how model data is saved to NetCDF files
 # First two lines *must* contain the experiment name, and the base time for
-# the time axis. Note this is not a builtin fortran feature; GFDL model just
-# reads and parses this file according to a certain syntax.
+# the time axis (i.e. no comments above these lines!).
 
 # Next lines indicate filenames with 6 comma-separated values
 # 1) file name
@@ -25,17 +24,17 @@
 # 8) save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
 # Note cannot save time-average data in same file as non-time-average data
 # If you accidentally try to output two vars w/ same name, get silent failure
+"dynamics", "bk",     "hybi",  "file", "all", .false., "none", 2,
+"dynamics", "pk",     "hyai",  "file", "all", .false., "none", 2,
+"dynamics", "slp",    "slp",   "file", "all", .false., "none", 2,
 "dynamics", "temp",   "t",     "file", "all", .false., "none", 2,
 "dynamics", "ucomp",  "u",     "file", "all", .false., "none", 2,
 "dynamics", "vcomp",  "v",     "file", "all", .false., "none", 2,
 "dynamics", "omega",  "omega", "file", "all", .false., "none", 2,
-"dynamics", "slp",    "slp",   "file", "all", .false., "none", 2,
-"dynamics", "bk",     "hybi",  "file", "all", .false., "none", 2,
-"dynamics", "pk",     "hyai",  "file", "all", .false., "none", 2,
 "forcing",  "tdt",    "tdt",   "file", "all", .false., "none", 2,
 "forcing",  "udt",    "udt",   "file", "all", .false., "none", 2,
 "forcing",  "vdt",    "vdt",   "file", "all", .false., "none", 2,
-# Derivable dynamics params (you can calculate vor from u and v, z from hypsometric):
+# Derivable dynamics params (you can calculate vor from u and v, z from hypsometric)
 # "dynamics", "vor",    "vor", filename, "all", .false., "none", 2,
 # "dynamics", "height", "z",   filename, "all", .false., "none", 2,
 # Mean and anomaly forcing components

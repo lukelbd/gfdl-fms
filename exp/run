@@ -291,13 +291,14 @@ run_model() {
 dir_setup 0 $expdir/constants
 nml_replace $expdir/constants/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
 cat >$expdir/constants/diag_table <<EOF
-"Forcing scheme for dry core experiments"
+"Constant and initial state for dry core experiments"
 0 0 0 0 0 0
 # Filename
 "constants", 1, "seconds", 1, "days", "time",
 # Parameters
 "dynamics", "ps",         "ps",         "constants", "all", .false., "none", 2,
-"dynamics", "surf",       "surf",       "constants", "all", .false., "none", 2,
+"dynamics", "slp",        "slp",        "constants", "all", .false., "none", 2,
+"dynamics", "zsurf",      "zsurf",      "constants", "all", .false., "none", 2,
 "dynamics", "bk",         "hybi",       "constants", "all", .false., "none", 2,
 "dynamics", "pk",         "hyai",       "constants", "all", .false., "none", 2,
 "forcing",  "teq",        "teq",        "constants", "all", .false., "none", 2,

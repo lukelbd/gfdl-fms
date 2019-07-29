@@ -81,7 +81,7 @@ diag_clean() {
 
 # Add lines to diagnostic table
 diag_add() {
-  [ $# -ne 3 ] && echo "Usage: diag_add DIAG_FILE 'filename line' 'variable line'"
+  [ $# -lt 3 ] && echo "Usage: diag_add DIAG_FILE 'filename line' 'variable line 1' ['variable line 2' ...]"
   local var file vars
   file='"'"$(echo "$2" | sed 's/"/\\"/g')"'"'
   vars='"'
@@ -89,11 +89,9 @@ diag_add() {
     vars+="$(echo "$var" | sed 's/"/\\"/g')\n"
   done
   vars="${vars%??}"'"'
-  echo "$file"
-  echo "$vars"
   cat $1 | awk 'START {j=0}
     /^"/ {i++}
     i==2 && j==0 {print '"$file"'; j=1}
     i==3 && j==1 {print '"$vars"'; j=2}
-    1'
+    1' >tmp && mv tmp $1
 }

@@ -49,6 +49,7 @@ source $sdir/header.sh
 shopt -u nullglob
 ulimit -s unlimited
 export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
+export LD_LIBRARY_PATH="/usr/lib64/mpich/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 
 # Parse input flags
 # Read the comments to see explanations for each option

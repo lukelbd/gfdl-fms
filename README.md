@@ -16,11 +16,11 @@ The full, original model documentation is published on [github-pages](https://lu
 
 * [bgrid.pdf](https://lukelbd.github.io/gfdl-fms/doc/bgrid.pdf), [spectral_core.pdf](https://lukelbd.github.io/gfdl-fms/doc/spectral_core.pdf), [shallow.pdf](https://lukelbd.github.io/gfdl-fms/doc/shallow.pdf), [barotropic.pdf](https://lukelbd.github.io/gfdl-fms/doc/barotropic.pdf), contain background information on the model physical equations.
 * [diag_table](exp/diag_table) is a template "diagnostic table". It specifies the model output NetCDF files, time-averaging behavior, and variable names. A brief description of this file format in found in the [diag_table](exp/diag_table) comments. Full lists of diagnostic table parameters are found on the following pages.
-    * [spectral_dynamics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral/model/spectral_dynamics.html)
+    * [barotropic_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_barotropic/barotropic_diagnostics.html)
     * [bgrid_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_bgrid/tools/bgrid_diagnostics.html)
     * [forcing.html](https://lukelbd.github.io/gfdl-fms/src/atmos_param/forcing/forcing.html)
-    * [barotropic_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_barotropic/barotropic_diagnostics.html)
     * [shallow_diagnostics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral_shallow/shallow_diagnostics.html)
+    * [spectral_dynamics.html](https://lukelbd.github.io/gfdl-fms/src/atmos_spectral/model/spectral_dynamics.html)
 * [input.nml](exp/input.nml) is a template namelist file. It allows you to specify various model settings and forcing parameters at run-time, rather than compile-time. Brief descriptions of some important parameters are found in the [input.nml](exp/input.nml) comments. Full tables and descriptions for all namelist parameters are found on the following pages:
     * [atmos_model.html](https://lukelbd.github.io/gfdl-fms/src/atmos_solo/atmos_model.html)
     * [atmos_bgrid/atmosphere.html](https://lukelbd.github.io/gfdl-fms/src/atmos_bgrid/driver/solo/atmosphere.html)

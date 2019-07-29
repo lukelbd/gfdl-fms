@@ -97,6 +97,11 @@
   q0_global       = 0.0,        ! globally uniform heating
   q0_surface      = 0.0,        ! average strength of boundary layer heating, that decays linearly from surface to top of boundary layer
   q0_lsp          = 0.0,        ! intensity of lsp forcing
+  m_lsp           = 1.0,        ! next lines are LSP heating terms
+  p0_lsp          = 800.0,
+  pt_lsp          = 200.0,
+  lat0_lsp        = 45.0,
+  slat_lsp        = 10.0,
 /
 
 ! Topography namelist

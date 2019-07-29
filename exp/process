@@ -3,20 +3,37 @@
 # This script processes results as they are produced by the model
 #------------------------------------------------------------------------------#
 # Initial stuff
+shopt -s nullglob
 rdir=$(readlink -f ${0})
 rdir=${rdir%/*}
 source $rdir/header.sh
-ncfile="$1"
-files=(${ncfile%%.*}.nc*) # glob expands into "bash array" of files; the %%.* is a "parameter expansion" (google this)
 mppnccombine=${rdir}/mppnccombine.x # netcdf combine executable
 [ -x $mppnccombine ] || raise "$mppnccombine is missing or is not executable."
 
-# Merge
+# Loop through each file
 t0=$(date +%s)
-echo "Combining files: ${files[@]} into ${ncfile%%.*}.nc"
-[ -d ../netcdf ] || mkdir ../netcdf # make directory if doesn't exist
-$mppnccombine -r ${ncfile%%.*}.nc ${files[@]} # -r flag says to remove the decomposed .0000 files after they are combined
-[ $? -ne 0 ] && raise "mppnccombine failed."
-mv ${ncfile%%.*}.nc ../netcdf/${ncfile%%.*}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc
-[ -z "$pinline" ] && pinline=$sdir/process
+prefixes=(*.nc.0000)
+if [ ${#prefixes[@]} -eq 0 ]; then
+  parallel=false
+  prefixes=(*.nc) # already present?
+  [ ${#prefixes[@]} -eq 0 ] && raise "Model output files not found." # make sure nullglob turned off
+  echo "Note: Model ran on only 1 core, do not need to merge files."
+  exit 0
+fi
+
+# Iterate prefixes
+for prefix in ${prefixes[@]}; do
+  base=${prefix%%.*}
+  for part in ${base}.nc*; do
+    num=${part##*.}
+    mv $part ${base}.${num}.nc
+  done
+  # Merge
+  ncfiles=(${base}.*.nc)
+  echo "Combining files: ${ncfiles[@]} into ${base}.nc"
+  [ -d ../netcdf ] || mkdir ../netcdf # make directory if doesn't exist
+  $mppnccombine -r ${base}.nc ${ncfiles[@]} # -r flag says to remove the decomposed .0000 files after they are combined
+  [ $? -ne 0 ] && raise "mppnccombine failed."
+  mv ${base}.nc ../netcdf/${base}.${PWD##*/}.nc # name will be, e.g., 4xdaily_inst.d0000-d0100.nc
+done
 echo "TOTAL ELAPSED TIME: $(($(date +%s) - t0))s."

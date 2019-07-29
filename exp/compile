@@ -25,6 +25,7 @@ root=$cwd/../
 cppdefs='-Duse_libMPI -Duse_netCDF'
 ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
+export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
 # Host-specific settings
 # Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags,
 # so use mpif90/mpiifort (identical) instead of ifort

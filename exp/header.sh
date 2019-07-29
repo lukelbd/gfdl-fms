@@ -75,5 +75,25 @@ diag_replace() {
 
 # Clean up diag_table comments and empty lines
 diag_clean() {
+  [ $# -ne 1 ] && echo "Usage: diag_add DIAG_FILE"
   sed -i 's/#.*$//g;/^[ \t]*$/d' $1 # remove comments, empty lines, for clarity
+}
+
+# Add lines to diagnostic table
+diag_add() {
+  [ $# -ne 3 ] && echo "Usage: diag_add DIAG_FILE 'filename line' 'variable line'"
+  local var file vars
+  file='"'"$(echo "$2" | sed 's/"/\\"/g')"'"'
+  vars='"'
+  for var in "${@:3}"; do
+    vars+="$(echo "$var" | sed 's/"/\\"/g')\n"
+  done
+  vars="${vars%??}"'"'
+  echo "$file"
+  echo "$vars"
+  cat $1 | awk 'START {j=0}
+    /^"/ {i++}
+    i==2 && j==0 {print '"$file"'; j=1}
+    i==3 && j==1 {print '"$vars"'; j=2}
+    1'
 }

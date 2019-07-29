@@ -95,7 +95,7 @@ namelist /forcing_nml/  no_forcing, locked_heating, conserve_energy, &
   exp_b, sigma_b, p_sponge, p_logeval, z_ozone, z_kdepth, &
   ktrop, kbl, kstrat, kmeso, kfric, ksponge, &
   trflux, trsink, &
-  q0_lsp, p0_lsp, pt_lsp, lat0_lsp, slat_lsp, &
+  q0_lsp, m_lsp, p0_lsp, pt_lsp, lat0_lsp, slat_lsp, &
   q0_tropical, q0_vortex, q0_arctic, q0_global, q0_surface, &
   x0_tropical, y0_tropical, sx_tropical, sy_tropical, &
   x0_vortex, y0_vortex, sx_vortex, sy_vortex, &

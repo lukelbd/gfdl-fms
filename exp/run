@@ -33,10 +33,12 @@ Optional arguments
   -f|--fix                Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
   -r|--resume             Resume model run from last block in the experiment directory. Use this to continue interrupted runs.
   [-c|--cores]=*          The number of cores to parallelize over.
+  [-d|--days]=*           The number of days in each experiment subfolder.
   [-p|--process]=*        Path to the processing script. Defaults to the includes './process' file.
   [-pi|--process-init]=*  Path to processing script for forcing run.
   [-ts|--tstart]=*        The initial day. Can use this to continue from another run.
   [-te|--tend]=*          The final day.
+  [-dt|--timestep]=*      The timestep in seconds.
   [-rd|--restart]=*       The initial restart directory.
   [-tsp|--tspindown]=*    Comma-separated list of initial spindown days.
 "
@@ -68,13 +70,15 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
     -f|--fix) fix=true ;;
     -i|--init) init=true ;; # *only* save forcing scheme data to file?
     -r|--resume) resume=true ;; # use this to *autodetect* last day of existing run, continue from there
+    -d=*|--days=*) days=${1#*=} ;; # number of days
     -m=*|--mode=*) mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
     -c=*|--cores=*) cores=${1#*=} ;;
     -p=*|--process=*) pinline=${1#*=} ;; # name of the process script
     -pi=*|--process-init=*) pinit=${1#*=} ;; # name of the process script
-    -rd=*|--restart=*) rinit=${1#*=} ;; # manual override restart directory
+    -dt=*|--timestep) timestep=${1#*=} ;;
     -ts=*|--tstart=*) tstart=${1#*=} ;; # use this to continue from *particular* day of existing run
     -te=*|--tend=*) tend=${1#*=} ;; # ending day
+    -rd=*|--restart=*) rinit=${1#*=} ;; # manual override restart directory
     -kts=*|--ktstart=*) ktstart=${1#*=} ;;
     -kte=*|--ktend=*) ktend=${1#*=} ;;
     -tsp=*|--tspindown=*) tspindown=($(echo ${1#*=} | tr ',' ' ')) ;;
@@ -102,7 +106,7 @@ which $run &>/dev/null || raise "$run not found in \$PATH."
 [ -z "$expdir" ] && raise "You must declare the experiment directory."
 [ -x "${sdir}/${model}.x" ] || raise "Invalid model \"${model}\". The executable \"${sdir}/${model}.x\" is missing."
 model=$sdir/${model}.x
-# Check user scripts
+# Make sure user scripts are available
 which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
 [ -z "$pinline" ] && pinline=$sdir/process
 [ -x "$pinline" ] || raise "Processing script $pinline not found or is not executable."
@@ -111,15 +115,29 @@ if [ -n "$pinit" ]; then
   [ -x "$pinit" ] || raise "Initial processing script $pinit not found or is not executable."
   pinit=$(realpath $pinit)
 fi
+
 # Restart directory
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
   rinit=($rinit/d*-d*)
   rinit="${rinit[-1]}"
   echo "Using final block from ${rinit##*/} for restart files."
 fi
+
 # Exit from script if directory already exists
 $new && [ -d $expdir ] && raise "Working directory already exists. Continuing..."
 [ -d $expdir ] || mkdir $expdir || raise "Could not create experiment directory \"$expdir\"."
+
+# Copy files
+for ifile in input.nml diag_table field_table; do
+  if ! [ -r $expdir/$ifile ]; then
+    echo "Copying default namelist $sdir/$ifile to ${expdir}."
+    cp $sdir/$ifile $expdir/
+  fi
+done
+# Apply timestep and days if they were passed
+[ -n "$days" ] && nml_replace $expdir/input.nml days "$days"
+[ -n "$timestep" ] && nml_replace $expdir/input.nml dt_atmos "$timestep"
+days=$(nml_parse $expdir/input.nml days) # number of days in each block
 
 ################################################################################
 # Function for restarting model. Puts correct files in correct place so
@@ -216,10 +234,6 @@ dir_setup() {
   # For shutdown experiments, can edit on the fly to turn off
   # radiation, et cetera, but this is starting point
   for ifile in input.nml diag_table field_table; do
-    if ! [ -r $expdir/$ifile ]; then
-      echo "Copying default namelist $sdir/$ifile to ${expdir}."
-      cp $sdir/$ifile $expdir/
-    fi
     cp $expdir/$ifile ./
   done
 
@@ -288,9 +302,8 @@ run_model() {
 # Run model for a second to get the *unchanging* params, i.e. zsurf, teq,
 # kdamp, kfric, and ksponge.
 ################################################################################
-[ -r $expdir/input.nml ] || raise "$expdir/input.nml not found."
-[ -d $expdir/constants ] || mkdir $expdir/constants
 # Set up directory
+[ -d $expdir/constants ] || mkdir $expdir/constants
 dir_setup 0 $expdir/constants
 nml_replace $expdir/constants/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
 cat >$expdir/constants/diag_table <<EOF
@@ -325,7 +338,6 @@ $init && exit 0
 # starting points from control for spin-down ensemble experiments
 ##############################################################################
 estatus=0
-days=$(nml_parse $expdir/input.nml days) # number of days in each block
 if [ $mode -eq 0 ]; then
   # Prepare for the loop
   echo "Running control experiment from day $tstart to day $tend on $cores cores, restart every $days days."

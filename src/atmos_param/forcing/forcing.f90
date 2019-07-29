@@ -193,9 +193,9 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
 
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
-  tdt_damp = 0.0
   if (locked_heating) then
     tdt_damp(:,:,:,1) = tdt_locked(:,:,:)
+    tdt_damp(:,:,:,2) = 0.0
   else
     call thermal_damping ( lat, sigma, p_full, z_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
@@ -729,21 +729,20 @@ do k=1,size(t,3)
     !
     !-----------------------------------------------------------------------
     if (.not. ndamp_decomp) then
-      ! Damp the *full* temperature, then exit
-      ! NOTE: Damping resides in the 'mean' slot, even though it is the full
-      ! damping! We just do this to avoid decomposition (and save a bit of time)
+      ! Damp the *full* temperature and exit
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t(:,:,k) - teq(:,:,k))
+      tdt(:,:,k,2) = 0.0
       tdamp(:,:,k,2) = tdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
     else if (c==1) then
-      ! Damp the mean
+      ! Damp the mean component
       t_bar = sum(t(:,:,k), 1)/size(t, 1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_bar
       enddo
       tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t_decomp(:,:,1) - teq(:,:,k))
     else if (c==2) then
-      ! Damp the anomaly
+      ! Damp the anomalous component
       t_decomp(:,:,2) = t(:,:,k) - t_decomp(:,:,1) ! anomaly relative to mean
       tdt(:,:,k,2) = -tdamp(:,:,k,2)*t_decomp(:,:,2)
     endif

@@ -44,13 +44,15 @@ contains
 
 subroutine spectral_init_cond(reference_sea_level_press, triang_trunc, use_virtual_temperature, topography_option, &
                               vert_coord_option, vert_difference_option, scale_heights, surf_res,    &
-                              p_press, p_sigma, exponent, ocean_topog_smoothing, pk, bk, vors, divs, &
+                              p_press, p_sigma, exponent, exp_pk, ocean_topog_smoothing, pk, bk, vors, divs, &
                               ts, ln_ps, ug, vg, tg, psg, vorg, divg, surf_geopotential, ocean_mask)
 
 real,    intent(in) :: reference_sea_level_press
 logical, intent(in) :: triang_trunc, use_virtual_temperature
 character(len=*), intent(in) :: topography_option, vert_coord_option, vert_difference_option
-real,    intent(in) :: scale_heights, surf_res, p_press, p_sigma, exponent, ocean_topog_smoothing
+real,    intent(in) :: scale_heights, surf_res, p_press, p_sigma, exponent
+integer, intent(in) :: exp_pk
+real,    intent(in) :: ocean_topog_smoothing
 real,    intent(out), dimension(:) :: pk, bk
 complex, intent(out), dimension(:,:,:) :: vors, divs, ts
 complex, intent(out), dimension(:,:  ) :: ln_ps
@@ -75,7 +77,7 @@ enddo
 call write_version_number(version, tagname)
 if(mpp_pe() == mpp_root_pe()) write (stdlog(), nml=spectral_init_cond_nml)
 
-call compute_vert_coord (vert_coord_option, scale_heights, surf_res, exponent, p_press, p_sigma, reference_sea_level_press, pk,bk)
+call compute_vert_coord (vert_coord_option, scale_heights, surf_res, exponent, exp_pk, p_press, p_sigma, reference_sea_level_press, pk,bk)
 
 call get_topography(topography_option, ocean_topog_smoothing, surf_geopotential, ocean_mask)
 call press_and_geopot_init(pk, bk, use_virtual_temperature, vert_difference_option, surf_geopotential)

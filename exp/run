@@ -58,6 +58,8 @@ fix=false
 resume=false
 tend=0
 tstart=0 # defaults
+ktstart=0
+ktend=0
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
     # Flags
@@ -213,15 +215,16 @@ dir_setup() {
   # Copy existing namelist file over
   # For shutdown experiments, can edit on the fly to turn off
   # radiation, et cetera, but this is starting point
-  [ -r $expdir/input.nml ] || raise "$expdir/input.nml file not found."
-  [ -r $expdir/diag_table ] || raise "$expdir/diag_table file not found."
-  [ -r $expdir/field_table ] || raise "$expdir/field_table file not found."
-  cp $expdir/input.nml ./
-  cp $expdir/diag_table ./
-  cp $expdir/field_table ./
+  for ifile in input.nml diag_table field_table; do
+    if ! [ -r $expdir/$ifile ]; then
+      echo "Copying default namelist $sdir/$ifile to ${expdir}."
+      cp $sdir/$ifile $expdir/
+    fi
+    cp $expdir/$ifile ./
+  done
 
   # Input files
-  heat=$(nml_parse input.nml input_heating)
+  heat=$(nml_parse input.nml locked_heating)
   topo=$(nml_parse input.nml topography_option) # use helper function
   if [ "$topo" == "input" ]; then
     [ -r $expdir/topography.data.nc ] || raise "Topography file \"$expdir/topography.data.nc\" not found."

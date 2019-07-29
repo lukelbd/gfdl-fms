@@ -60,9 +60,10 @@ contains
 
 !=======================================================================
 
-subroutine compute_vert_coord (vert_coord_option, scale_heights, surf_res, exponent, p_press, p_sigma, reference_press, a, b)
+subroutine compute_vert_coord (vert_coord_option, scale_heights, surf_res, exponent, exp_pk, p_press, p_sigma, reference_press, a, b)
 
 character(len=*), intent(in) :: vert_coord_option
+integer, intent(in) :: exp_pk
 real,    intent(in) :: scale_heights, surf_res, exponent, p_press, p_sigma, reference_press
 real,    intent(out), dimension(:) :: a, b
 
@@ -113,7 +114,7 @@ if(trim(vert_coord_option) == 'input') then
 else if(trim(vert_coord_option) == 'even_sigma') then
   call compute_even_sigma(a, b)
 else if(trim(vert_coord_option) == 'pk_sigma') then
-  call compute_pk_sigma(a, b)
+  call compute_pk_sigma(exp_pk, a, b)
 else if(trim(vert_coord_option) == 'uneven_sigma') then
   call compute_uneven_sigma(a, b, scale_heights, surf_res, exponent, .true.)
 else if(trim(vert_coord_option) == 'hybrid') then
@@ -201,16 +202,17 @@ end subroutine read_namelist
 
 !------------------------------------------------------------------------------!
 ! Author: Luke Davis (lukelbd@gmail.com). See: Polvani and Kushner (2002), GRL
-! Retrieve level boundaries separated by s(i) = (i/N)**5 for some N, wherever
+! Retrieve level boundaries separated by s(i) = (i/M)**5 for some M, wherever
 ! the RHS is greater than 10**-5, then add boundary s = 0 at the top.........
-! PROBLEM: Solve N in the equation: s(N-i+1) = ((N-i+1)/N)**5 == 10**-5, where
-! i == number of boundaries above zero that *we want*, i.e. i == num_levels
-! Levels above s=0 will be defined from i=num_levels to i=1.
-! SOLUTION: N == floor(num_levels/0.9) = floor(num_levels*10/9)
+! PROBLEM: Solve M in the equation: s(M-(N+1)) = ((M-(N+1))/M)**5 == 10**-5, where
+! N == number of boundaries above zero that *we want*, i.e. N == num_levels
+! Levels above s=0 will be defined from i=N to i=1.
+! SOLUTION: M == floor(num_levels/0.9) = floor(num_levels*10/9)
 
-subroutine compute_pk_sigma (a, b)
+subroutine compute_pk_sigma (exp_pk, a, b)
 
 integer :: k, num_pk, num_levels
+integer, intent(in) :: exp_pk
 real, intent(out), dimension(:) :: a, b
 
 num_levels = size(a,1)-1
@@ -219,7 +221,7 @@ num_pk     = (num_levels * 10) / 9
 a    = 0.0
 b(1) = 0.0 ! top always has zero pressure
 do k = num_levels, 1, -1
-  b(num_levels-k+2) = (float(num_pk-k+1) / float(num_pk)) ** 5
+  b(num_levels-k+2) = (float(num_pk-k+1) / float(num_pk)) ** exp_pk
 end do
 
 ! do k=1, num_levels+1

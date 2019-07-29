@@ -108,7 +108,6 @@ DELIM
 cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
 
 # Create makefile
-echo "Generating Makefile..."
 $mkmf -p ${model}.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
   $root/src/shared/mpp/include $root/src/shared/include ${include[@]} # the other include files
 [ $? -ne 0 ] && raise "Mppnccombine compilation failed."

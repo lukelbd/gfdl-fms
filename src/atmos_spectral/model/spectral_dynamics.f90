@@ -121,16 +121,17 @@ logical :: do_mass_correction      = .true. , &
            use_implicit            = .true.,  &
            triang_trunc            = .true.
 
-integer :: damping_order       =  2, &
-           damping_order_vor   = -1, &
-           damping_order_div   = -1, &
+integer :: damping_order       =  2,   &
+           damping_order_vor   = -1,   &
+           damping_order_div   = -1,   &
            lon_max             =  128, & ! T42
            lat_max             =  64,  & ! T42
            num_fourier         =  42,  & ! T42
            num_spherical       =  43,  & ! T42
            fourier_inc         =  1,   &
            num_levels          =  18,  &
-           num_steps           =  1
+           num_steps           =  1,   &
+           exp_pk              =  5
 
 integer, dimension(2) ::  print_interval=(/1,0/)
 
@@ -162,17 +163,17 @@ real    :: damping_coeff       = 1.15740741e-4, & ! (one tenth day)**-1
 
 real, dimension(2) :: valid_range_t = (/100.,500./)
 
-namelist /spectral_dynamics_nml/ use_virtual_temperature, damping_option,                            &
-                                 damping_order, damping_coeff, damping_order_vor, damping_coeff_vor, &
-                                 damping_order_div, damping_coeff_div, do_mass_correction,           &
-                                 do_water_correction, do_energy_correction, vert_advect_uv,          &
-                                 vert_advect_t, use_implicit, longitude_origin, robert_coeff,        &
-                                 alpha_implicit, vert_difference_option,                             &
-                                 reference_sea_level_press, lon_max, lat_max, num_levels,            &
-                                 num_fourier, num_spherical, fourier_inc, triang_trunc,              &
-                                 topography_option, vert_coord_option, scale_heights, surf_res,      &
-                                 p_press, p_sigma, exponent, ocean_topog_smoothing, initial_sphum,   &
-                                 valid_range_t, eddy_sponge_coeff, zmu_sponge_coeff, zmv_sponge_coeff, &
+namelist /spectral_dynamics_nml/ use_virtual_temperature, damping_option,                                  &
+                                 damping_order, damping_coeff, damping_order_vor, damping_coeff_vor,       &
+                                 damping_order_div, damping_coeff_div, do_mass_correction,                 &
+                                 do_water_correction, do_energy_correction, vert_advect_uv,                &
+                                 vert_advect_t, use_implicit, longitude_origin, robert_coeff,              &
+                                 alpha_implicit, vert_difference_option,                                   &
+                                 reference_sea_level_press, lon_max, lat_max, num_levels,                  &
+                                 num_fourier, num_spherical, fourier_inc, triang_trunc,                    &
+                                 topography_option, vert_coord_option, scale_heights, surf_res,            &
+                                 p_press, p_sigma, exponent, exp_pk, ocean_topog_smoothing, initial_sphum, &
+                                 valid_range_t, eddy_sponge_coeff, zmu_sponge_coeff, zmv_sponge_coeff,     &
                                  print_interval, num_steps
                                  
 contains
@@ -528,7 +529,7 @@ else
   current  = 1
   call spectral_init_cond(reference_sea_level_press, triang_trunc, use_virtual_temperature, topography_option,  &
                           vert_coord_option, vert_difference_option, scale_heights, surf_res, p_press, p_sigma, &
-                          exponent, ocean_topog_smoothing, pk, bk,                                              &
+                          exponent, exp_pk, ocean_topog_smoothing, pk, bk,                                      &
                           vors(:,:,:,1), divs(:,:,:,1), ts(:,:,:,1), ln_ps(:,:,1), ug(:,:,:,1), vg(:,:,:,1),    &
                           tg(:,:,:,1), psg(:,:,1), vorg, divg, surf_geopotential, ocean_mask)
 

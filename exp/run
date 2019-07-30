@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-usage='run [-hnifr] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] MODEL_TYPE EXPERIMENT_DIR'
+usage='run [-hndifr] [-c|--cores]=CORES [-ts|--tstart]=START [-te|--tend]=END [OPTIONS...] MODEL_TYPE EXPERIMENT_DIR'
 doc="This script runs the GFDL dry core model in blocks of N days, and processes
 the parallel output NetCDF files with './process' before merging them. This means
 pressure level interpolation, heat flux calcualtion, etc. are done in parallel
@@ -12,8 +12,8 @@ Usage
 
 Positional arguments
 
-  DIR  The directory in which model will be run. Must have 'input.nml' and
-       'diag_table' files in the top level.
+  DIR  The directory in which model will be run. Copies 'input.nml' and
+       'diag_table' files to the top level.
 
 Run mode spec
 
@@ -28,19 +28,23 @@ Run mode spec
 Optional arguments
 
   -h|--help               Print this message.
-  -n|--new                Exit if experiment folder already exists.
   -i|--init               Exit after saving the 'constants.nc' data.
   -f|--fix                Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
   -r|--resume             Resume model run from last block in the experiment directory. Use this to continue interrupted runs.
   [-c|--cores]=*          The number of cores to parallelize over.
   [-d|--days]=*           The number of days in each experiment subfolder.
-  [-p|--process]=*        Path to the processing script. Defaults to the includes './process' file.
-  [-pi|--process-init]=*  Path to processing script for forcing run.
+  [-dt|--timestep]=*      The timestep in seconds.
   [-ts|--tstart]=*        The initial day. Can use this to continue from another run.
   [-te|--tend]=*          The final day.
-  [-dt|--timestep]=*      The timestep in seconds.
   [-rd|--restart]=*       The initial restart directory.
   [-tsp|--tspindown]=*    Comma-separated list of initial spindown days.
+  [-p|--process]=*        Path to the processing script. Defaults to the includes './process' file.
+  [-pi|--process-init]=*  Path to processing script for forcing run.
+  [-nml|--namelist]=*     Use this namelist for the experiment. Defaults to the one in the 'exp' folder.
+  [-diag|--diagtable]=*   Use this diagnostic table for the experiment. Defaults to the one in the 'exp' folder.
+  [-field|--fieldtable]=* Use this field table for the experiment. Defaults to the one in the 'exp' folder.
+  [-topo|--topography]=*  Use this topography data for the experiment. Defaults to no input topography. Your namelist must have topography_option='input'
+  [-tdt|--heating]=*      Use this heating data for the experiment. Defaults to no input heating. Your namelist must have locked_heating=.true.
 "
 # Initial stuff
 sdir=$(readlink -f ${0})
@@ -48,14 +52,14 @@ sdir=${sdir%/*}
 source $sdir/header.sh
 shopt -u nullglob
 ulimit -s unlimited
+which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
 export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
 export LD_LIBRARY_PATH="/usr/lib64/mpich/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 
 # Parse input flags
-# Read the comments to see explanations for each option
+# First declare some defaults
 cores=8
 mode=0
-new=false
 init=false
 fix=false
 resume=false
@@ -63,19 +67,20 @@ tend=0
 tstart=0 # defaults
 ktstart=0
 ktend=0
+nml=$sdir/input.nml
+diag=$sdir/diag_table
+field=$sdir/field_table
+pinline=$sdir/process
 while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
     # Flags
     -h|--help) echo "$doc" && exit 0 ;;
-    -n|--new) new=true ;; # use this to *exit* if experiment folder already exists
     -f|--fix) fix=true ;;
     -i|--init) init=true ;; # *only* save forcing scheme data to file?
     -r|--resume) resume=true ;; # use this to *autodetect* last day of existing run, continue from there
+    -c=*|--cores=*) cores=${1#*=} ;;
     -d=*|--days=*) days=${1#*=} ;; # number of days
     -m=*|--mode=*) mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
-    -c=*|--cores=*) cores=${1#*=} ;;
-    -p=*|--process=*) pinline=${1#*=} ;; # name of the process script
-    -pi=*|--process-init=*) pinit=${1#*=} ;; # name of the process script
     -dt=*|--timestep) timestep=${1#*=} ;;
     -ts=*|--tstart=*) tstart=${1#*=} ;; # use this to continue from *particular* day of existing run
     -te=*|--tend=*) tend=${1#*=} ;; # ending day
@@ -83,6 +88,13 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
     -kts=*|--ktstart=*) ktstart=${1#*=} ;;
     -kte=*|--ktend=*) ktend=${1#*=} ;;
     -tsp=*|--tspindown=*) tspindown=($(echo ${1#*=} | tr ',' ' ')) ;;
+    -p=*|--process=*) pinline=${1#*=} ;; # name of the process script
+    -pi=*|--process-init=*) pinit=${1#*=} ;; # name of the process script
+    -nml=*|--namelist=*) nml=${1#*=} ;;
+    -diag=*|--diagtable=*) diag=${1#*=} ;;
+    -field=*|--fieldtable=*) field=${1#*=} ;;
+    -topo=*|--topography=*) topo=${1#*=} ;;
+    -tdt=*|--heating=*) tdt=${1#*=} ;;
     -*) gpflags+="$1 " ;; # send all extra flags to process function
     # Positional args
     *)
@@ -107,16 +119,28 @@ which $run &>/dev/null || raise "$run not found in \$PATH."
 [ -z "$expdir" ] && raise "You must declare the experiment directory."
 [ -x "${sdir}/${model}.x" ] || raise "Invalid model \"${model}\". The executable \"${sdir}/${model}.x\" is missing."
 model=$sdir/${model}.x
-# Make sure user scripts are available
-which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
-[ -z "$pinline" ] && pinline=$sdir/process
-[ -x "$pinline" ] || raise "Processing script $pinline not found or is not executable."
+# Default files and scripts
+nml=$(realpath $nml)
+diag=$(realpath $diag)
+field=$(realpath $field)
 pinline=$(realpath $pinline)
+[ -r "$nml" ] || raise "Namelist file \"$nml\" not found or is not readable."
+[ -r "$diag" ] || raise "Diagnostic table file \"$diag\" not found or is not readable."
+[ -r "$field" ] || raise "Field table file \"$field\" not found or is not readable."
+[ -x "$pinline" ] || raise "Processing script \"$pinline\" not found or is not executable."
 if [ -n "$pinit" ]; then
-  [ -x "$pinit" ] || raise "Initial processing script $pinit not found or is not executable."
   pinit=$(realpath $pinit)
+  [ -x "$pinit" ] || raise "Initial processing script \"$pinit\" not found or is not executable."
 fi
-
+if [ -n "$topo" ]; then
+  topo=$(realpath $topo)
+  [ -r "$topo" ] || raise "Topography file \"$topo\" not found or is not readable."
+fi
+if [ -n "$tdt" ]; then
+  tdt=$(realpath $tdt)
+  [ -r "$tdt" ] || raise "Diabatic heating file \"$tdt\" not found or is not readable."
+fi
+# Namelist, diag table, field table
 # Restart directory
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
   rinit=($rinit/d*-d*)
@@ -124,17 +148,15 @@ if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
   echo "Using final block from ${rinit##*/} for restart files."
 fi
 
-# Exit from script if directory already exists
-$new && [ -d $expdir ] && raise "Working directory already exists. Continuing..."
+# Make experiment directory
 [ -d $expdir ] || mkdir $expdir || raise "Could not create experiment directory \"$expdir\"."
-
 # Copy files
-for ifile in input.nml diag_table field_table; do
-  if ! [ -r $expdir/$ifile ]; then
-    echo "Copying default namelist $sdir/$ifile to ${expdir}."
-    cp $sdir/$ifile $expdir/
-  fi
-done
+# Ignore error if these are the same file
+cp $nml $expdir/input.nml 2>/dev/null
+cp $diag $expdir/diag_table 2>/dev/null
+cp $field $expdir/field_table 2>/dev/null
+[ -n "$topo" ] && cp $topo $expdir/topography.data.nc 2>/dev/null
+[ -n "$tdt" ] && cp $tdt $expdir/tdt.data.nc 2>/dev/null
 # Apply timestep and days if they were passed
 [ -n "$days" ] && nml_replace $expdir/input.nml days "$days"
 [ -n "$timestep" ] && nml_replace $expdir/input.nml dt_atmos "$timestep"
@@ -293,7 +315,8 @@ run_model() {
   if [ -n "$process" ]; then
     echo "Calling processing script with flags: $(echo $pflags $gpflags | xargs)"
     $process $pflags $gpflags &>process.log
-    [ $? -ne 0 ] && raise "Exit status $? from processing NetCDF files. Check $(pwd)/process.log"
+    stat=$?
+    [ $stat -ne 0 ] && raise "Exit status $stat from processing NetCDF files. Check $(pwd)/process.log"
     tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Process time: ${tprocess%.*}s."
   fi

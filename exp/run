@@ -39,7 +39,7 @@ Optional arguments
   [-rd|--restart]=*       The initial restart directory.
   [-tsp|--tspindown]=*    Comma-separated list of initial spindown days.
   [-p|--process]=*        Path to the processing script. Defaults to the includes './process' file.
-  [-pi|--process-init]=*  Path to processing script for forcing run.
+  [-pi|--process-init]=*  Path to processing script for initial 'constants' run.
   [-nml|--namelist]=*     Use this namelist for the experiment. Defaults to the one in the 'exp' folder.
   [-diag|--diagtable]=*   Use this diagnostic table for the experiment. Defaults to the one in the 'exp' folder.
   [-field|--fieldtable]=* Use this field table for the experiment. Defaults to the one in the 'exp' folder.
@@ -161,6 +161,9 @@ cp $field $expdir/field_table 2>/dev/null
 [ -n "$days" ] && nml_replace $expdir/input.nml days "$days"
 [ -n "$timestep" ] && nml_replace $expdir/input.nml dt_atmos "$timestep"
 days=$(nml_parse $expdir/input.nml days) # number of days in each block
+[ "$days" -eq 0 ] && raise "Namelist file \"$expdir/input.nml\" has run length days=0. You can change this by providing your own namelist with -nml=file or using the flag -d=days."
+dt=$(nml_parse $expdir/input.nml dt_atmos)
+[ "$dt" -eq 0 ] && raise "Namelist file \"$expdir/input.nml\" has model timestep dt_atmos=0. You can change this by providing your own namelist with -nml=file or using the flag -dt=timestep."
 
 ################################################################################
 # Function for restarting model. Puts correct files in correct place so
@@ -229,6 +232,7 @@ dir_setup() {
   elif $resume; then
     # Resume interrupted run
     # NOTE: This checks for contents of netcdf folder
+    # if compgen -G "$wdir/../netcdf/*tdt*${wdir##*/}.nc" &>/dev/null; then
     if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
       echo "NetCDF files already exist for block ${wdir##*/}. Cancelling..."
       return 1 # breaks out of if statement

@@ -204,7 +204,7 @@ dir_setup() {
   usage="dir_setup CURRENT_DAY CURRENT_DIR"
   cday="$1"
   wdir="$2" # where to move files
-  if [ ${wdir##*/} == "forcing" ]; then
+  if [ ${wdir##*/} == "constants" ]; then
     rm -rf $wdir 2>/dev/null
   elif ! [ -d $wdir ]; then
     # Resume run here

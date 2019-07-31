@@ -459,12 +459,12 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   ! Equilibrium temp
   id_teq = register_diag_field ( mod_name, 'teq', axes(1:3), Time, &
     'equilibrium temperature', 'deg_K', &
-    missing_value=missing_value, range=(/100.,400./) )
+    missing_value=missing_value, range=(/0.,500./) )
 
   ! Rate of temp change due to damping and damping rate
   id_tdt = register_diag_field ( mod_name, 'tdt', axes(1:3), Time, &
-    'heating', 'deg_K/sec',    &
-    missing_value=missing_value     )
+    'heating', 'deg_K/sec', &
+    missing_value=missing_value )
 
   id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
     'thermal damping coefficient', 'sec-1', &
@@ -472,12 +472,12 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
 
   if (ndamp_decomp) then
     id_tdt_mean = register_diag_field ( mod_name, 'tdt_mean', axes(1:3), Time, &
-      'heating, mean component', 'deg_K/sec',    &
-      missing_value=missing_value     )
+      'heating, mean component', 'deg_K/sec', &
+      missing_value=missing_value )
 
     id_tdt_anom = register_diag_field ( mod_name, 'tdt_anom', axes(1:3), Time, &
-      'heating, anomaly component', 'deg_K/sec',    &
-      missing_value=missing_value     )
+      'heating, anomaly component', 'deg_K/sec', &
+      missing_value=missing_value )
 
     id_ndamp_mean = register_diag_field ( mod_name, 'ndamp_mean', axes(1:3), Time, &
       'thermal damping coefficient, mean component', 'sec-1', &
@@ -492,7 +492,7 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   if (conserve_energy) then
     id_tdt_diss = register_diag_field ( mod_name, 'tdt_diss_rdamp', axes(1:3), &
       Time, 'dissipative heating from frictional damping', 'deg_K/sec',&
-      missing_value=missing_value     )
+      missing_value=missing_value )
 
     id_heat_diss = register_diag_field ( mod_name, 'diss_rdamp', axes(1:2), &
       Time, 'integrated dissipative heating for frictional damping', 'W/m2')
@@ -505,7 +505,7 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
 
   id_vdt = register_diag_field ( mod_name, 'vdt', axes(1:3), Time, &
     'frictional meridional wind damping', 'm/s2',  &
-    missing_value=missing_value     )
+    missing_value=missing_value )
 
   id_rdamp = register_diag_field ( mod_name, 'rdamp', axes(1:3), Time, &
     'frictional damping coefficient', 'sec-1', &
@@ -514,19 +514,19 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   if (rdamp_decomp) then
     id_udt_mean = register_diag_field ( mod_name, 'udt_mean', axes(1:3), Time, &
       'frictional zonal wind damping, mean component', 'm/s2',       &
-      missing_value=missing_value     )
+      missing_value=missing_value )
 
     id_udt_anom = register_diag_field ( mod_name, 'udt_anom', axes(1:3), Time, &
-      'frictional zonal wind damping, anomaly component', 'm/s2',       &
-      missing_value=missing_value     )
+      'frictional zonal wind damping, anomaly component', 'm/s2', &
+      missing_value=missing_value )
 
     id_vdt_mean = register_diag_field ( mod_name, 'vdt_mean', axes(1:3), Time, &
-      'frictional meridional wind damping, mean component', 'm/s2',  &
-      missing_value=missing_value     )
+      'frictional meridional wind damping, mean component', 'm/s2', &
+      missing_value=missing_value )
 
     id_vdt_anom = register_diag_field ( mod_name, 'vdt_anom', axes(1:3), Time, &
-      'frictional meridional wind damping, anomaly component', 'm/s2',  &
-      missing_value=missing_value     )
+      'frictional meridional wind damping, anomaly component', 'm/s2', &
+      missing_value=missing_value )
 
     id_rdamp_mean = register_diag_field ( mod_name, 'rdamp_mean', axes(1:3), Time, &
       'frictional damping coefficient, mean component', 'sec-1', &

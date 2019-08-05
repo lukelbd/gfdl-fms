@@ -245,10 +245,10 @@ dir_setup() {
     # NOTE: This checks for contents of netcdf folder
     # if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
     # if compgen -G "$wdir/../netcdf/*tdt*${wdir##*/}.nc" &>/dev/null; then
+    # if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
     #   && compgen -G "$wdir/../netcdf/*tdt*${wdir##*/}.nc" &>/dev/null; then
-    # if compgen -G "$wdir/RESTART/*.nc" &>/dev/null \
     #   && compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
-    if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
+    if compgen -G "$wdir/RESTART/*.nc" &>/dev/null \
       echo "NetCDF files already exist for block ${wdir##*/}. Cancelling..."
       return 1 # breaks out of if statement
     fi

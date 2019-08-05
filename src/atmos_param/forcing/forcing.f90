@@ -108,7 +108,7 @@ character(len=128) :: tagname='$Name: latest $'
 real :: trdamp
 real, dimension(2) :: tktrop, tkbl, tkstrat, tkmeso, vkfric, vksponge
 integer :: id_forcing, id_teq, &
-  id_ndamp, id_rdamp, id_sdamp, id_tdt, id_udt, id_vdt, &
+  id_ndamp, id_rdamp, id_sdamp, id_tdt, id_heating, id_udt, id_vdt, &
   id_ndamp_mean, id_ndamp_anom, id_rdamp_mean, id_rdamp_anom, &
   id_tdt_mean, id_tdt_anom, id_udt_mean, id_udt_anom, id_vdt_mean, id_vdt_anom, &
   id_tdt_diss, id_heat_diss, &
@@ -194,8 +194,9 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
   !     Thermal damping for held & suarez (1994) benchmark calculation
   !     Alternatively load heating from file
   if (locked_heating) then
-    tdt_damp(:,:,:,1) = tdt_locked(:,:,:)
+    tdt_damp(:,:,:,1) = tdt_locked
     tdt_damp(:,:,:,2) = 0.0
+    if (id_heating > 0) used = send_data(id_heating, tdt_locked, Time, is, js)
   else
     call thermal_damping ( lat, sigma, p_full, z_full, t, tdt_damp, tdamp, teq, mask=mask )
   endif
@@ -465,6 +466,12 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   id_tdt = register_diag_field ( mod_name, 'tdt', axes(1:3), Time, &
     'heating', 'deg_K/sec', &
     missing_value=missing_value )
+
+  if (locked_heating) then
+    id_heating = register_diag_field (mod_name, 'heating', axes(1:3), Time, &
+      'locked heating', 'deg_K/sec', &
+      missing_value=missing_value )
+  endif
 
   id_ndamp = register_diag_field ( mod_name, 'ndamp', axes(1:3), Time, &
     'thermal damping coefficient', 'sec-1', &

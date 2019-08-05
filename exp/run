@@ -29,8 +29,9 @@ Optional arguments
 
   -h|--help               Print this message.
   -i|--init               Exit after saving the 'constants.nc' data.
-  -f|--fix                Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
   -r|--resume             Resume model run from last block in the experiment directory. Use this to continue interrupted runs.
+  -rs|--restart           Exit if the experiment ran successfully through time 'tend'. Use this to restart crashed runs with smaller timestep.
+  -rt|--restart-tdt       Exit if we have generated tdt files through time 'tend'. Use this when generating data for locked runs.
   [-c|--cores]=*          The number of cores to parallelize over.
   [-d|--days]=*           The number of days in each experiment subfolder.
   [-dt|--timestep]=*      The timestep in seconds.
@@ -58,11 +59,12 @@ export LD_LIBRARY_PATH="/usr/lib64/mpich/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 
 # Parse input flags
 # First declare some defaults
-cores=8
 mode=0
+cores=8
 init=false
-fix=false
 resume=false
+irestart=false
+jrestart=false
 tend=0
 tstart=0 # defaults
 ktstart=0
@@ -75,12 +77,13 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
   case "$1" in
     # Flags
     -h|--help) echo "$doc" && exit 0 ;;
-    -f|--fix) fix=true ;;
     -i|--init) init=true ;; # *only* save forcing scheme data to file?
     -r|--resume) resume=true ;; # use this to *autodetect* last day of existing run, continue from there
-    -c=*|--cores=*) cores=${1#*=} ;;
-    -d=*|--days=*) days=${1#*=} ;; # number of days
+    -rs|--restart) irestart=true ;;
+    -rt|--restart-tdt) jrestart=true ;;
+    -d=*|--days=*) rdays=${1#*=} ;; # number of days
     -m=*|--mode=*) mode=${1#*=} ;; # 0 is control, 1 is spindown, 2...
+    -c=*|--cores=*) cores=${1#*=} ;;
     -dt=*|--timestep) timestep=${1#*=} ;;
     -ts=*|--tstart=*) tstart=${1#*=} ;; # use this to continue from *particular* day of existing run
     -te=*|--tend=*) tend=${1#*=} ;; # ending day
@@ -145,7 +148,6 @@ fi
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
   rinit=($rinit/d*-d*)
   rinit="${rinit[-1]}"
-  echo "Using final block from ${rinit##*/} for restart files."
 fi
 
 # Make experiment directory
@@ -155,15 +157,40 @@ fi
 cp $nml $expdir/input.nml 2>/dev/null
 cp $diag $expdir/diag_table 2>/dev/null
 cp $field $expdir/field_table 2>/dev/null
+[ -n "$tdt" ] && cp $tdt $expdir/heating.data.nc 2>/dev/null
 [ -n "$topo" ] && cp $topo $expdir/topography.data.nc 2>/dev/null
-[ -n "$tdt" ] && cp $tdt $expdir/tdt.data.nc 2>/dev/null
 # Apply timestep and days if they were passed
-[ -n "$days" ] && nml_replace $expdir/input.nml days "$days"
+[ -n "$rdays" ] && nml_replace $expdir/input.nml days "$rdays"
 [ -n "$timestep" ] && nml_replace $expdir/input.nml dt_atmos "$timestep"
-days=$(nml_parse $expdir/input.nml days) # number of days in each block
-[ "$days" -eq 0 ] && raise "Namelist file \"$expdir/input.nml\" has run length days=0. You can change this by providing your own namelist with -nml=file or using the flag -d=days."
+rdays=$(nml_parse $expdir/input.nml days) # number of days in each block
+[ "$rdays" -eq 0 ] && raise "Namelist file \"$expdir/input.nml\" has run length days=0. You can change this by providing your own namelist with -nml=file or using the flag -d=days."
 dt=$(nml_parse $expdir/input.nml dt_atmos)
 [ "$dt" -eq 0 ] && raise "Namelist file \"$expdir/input.nml\" has model timestep dt_atmos=0. You can change this by providing your own namelist with -nml=file or using the flag -dt=timestep."
+
+# Bail out of entire script in some situations
+if $irestart; then
+  # Restart failed run from *beginning*, suitable for when run is unstable
+  # and we are trying a smaller timestep
+  edays=($expdir/d????-d????)
+  edays=(${edays[@]##*d})
+  if [ ${edays[-1]} == $tend ]; then
+    echo "Model run already completed."
+    exit 0
+  fi
+  echo "Restarting experiment."
+fi
+if $jrestart; then
+  # Check that mean NetCDF files exist all the way out, bail if they
+  # do. Use this to generate tdt files for locked runs.
+  edays=($expdir/netcdf/mean_tdt.d????-d????.nc)
+  edays=(${edays[@]##*d})
+  edays=(${edays[@]%.nc})
+  if [ ${edays[-1]} == $tend ]; then
+    echo "Already generated tdt files."
+    exit 0
+  fi
+  echo "Restarting experiment."
+fi
 
 ################################################################################
 # Function for restarting model. Puts correct files in correct place so
@@ -212,27 +239,15 @@ dir_setup() {
   elif ! [ -d $wdir ]; then
     # Resume run here
     echo "Setting up working directory ${wdir##*/}..."
-    fix=false
     resume=false
-  elif $fix; then
-    # Restart failed run from *beginning*, suitable for when run is unstable
-    # and we are trying a smaller timestep
-    # TODO: Do not hardcode final experiment day
-    days=($wdir/../d????-d????)
-    days=(${days[@]##*d})
-    if [ ${days[-1]} == $tend ]; then
-      echo "Model run already completed."
-      return 1
-    fi
-    # Go
-    echo "Restarting experiment."
-    fix=false
-    resume=false
-    rm -rf $wdir
   elif $resume; then
     # Resume interrupted run
     # NOTE: This checks for contents of netcdf folder
+    # if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
     # if compgen -G "$wdir/../netcdf/*tdt*${wdir##*/}.nc" &>/dev/null; then
+    #   && compgen -G "$wdir/../netcdf/*tdt*${wdir##*/}.nc" &>/dev/null; then
+    # if compgen -G "$wdir/RESTART/*.nc" &>/dev/null \
+    #   && compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
     if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
       echo "NetCDF files already exist for block ${wdir##*/}. Cancelling..."
       return 1 # breaks out of if statement
@@ -307,6 +322,7 @@ run_model() {
   grep -E 'EXIT CODE: [1-9]|FATAL from PE|WARNING from PE' model.log &>/dev/null && \
     raise "Bad exit status from model run step. Check $(pwd)/model.log"
   tmodel=$(cat model.log | grep "Total runtime*" | xargs | cut -d " " -f 5)
+  [ -z "$tmodel" ] && raise "Logfile model.log not found or is empty."
   echo "Model time: ${tmodel%.*}s." # is just max of the two
 
   # Remove some files
@@ -349,6 +365,7 @@ cat >$expdir/constants/diag_table <<EOF
 "forcing",  "ndamp",      "ndamp",      "constants", "all", .false., "none", 2,
 "forcing",  "rdamp",      "rdamp",      "constants", "all", .false., "none", 2,
 "forcing",  "sdamp",      "sdamp",      "constants", "all", .false., "none", 2,
+"forcing",  "heating",    "heating",    "constants", "all", .false., "none", 2,
 "forcing",  "forcing",    "forcing",    "constants", "all", .false., "none", 2,
 "forcing",  "ndamp_mean", "ndamp_mean", "constants", "all", .false., "none", 2,
 "forcing",  "ndamp_anom", "ndamp_anom", "constants", "all", .false., "none", 2,
@@ -362,25 +379,26 @@ $init && exit 0
 
 ##############################################################################
 # Control run
-# Run the model in blocks of $days days for control, then optionally choose
+# Run the model in blocks of $rdays days for control, then optionally choose
 # starting points from control for spin-down ensemble experiments
 ##############################################################################
 estatus=0
 if [ $mode -eq 0 ]; then
   # Prepare for the loop
-  echo "Running control experiment from day $tstart to day $tend on $cores cores, restart every $days days."
+  echo "Running control experiment from day $tstart to day $tend on $cores cores, restart every $rdays days."
   coldstart=true # assume cold start by default
   t0=$(date +%s) # start time
   pday=0 # only time when we do minus days
   cday=0
-  nday=$days
+  nday=$rdays
   while [ $nday -le $tend ]; do
     # Message and reset timer/flags
     if [ $cday -lt $tstart ]; then
+      [ -n "$rinit" ] && echo "Ignoring restart directory ${rinit}."
       unset rinit # important! for 'resume' experiments, generally just want to use rinit as cold start alternative
       pday=$cday # previous day
-      cday=$((pday + days))
-      nday=$((cday + days))
+      cday=$((pday + rdays))
+      nday=$((cday + rdays))
       continue
     fi
     echo "Running from day $cday to day $nday."
@@ -409,11 +427,11 @@ if [ $mode -eq 0 ]; then
       fi
       run_model $cday $cores $pinline
     fi
-    [ $days -eq 0 ] && break # exit for initial condition experiment
+    [ $rdays -eq 0 ] && break # exit for initial condition experiment
     # Step things forward, for next iteration
     pday=$cday
-    cday=$((pday + days))
-    nday=$((cday + days))
+    cday=$((pday + rdays))
+    nday=$((cday + rdays))
   done
   # Last file
   if [ -r process.log ]; then
@@ -431,14 +449,14 @@ if [ $mode -eq 0 ]; then
 else
   # Prepare for the loop
   [ -z $tspindown ] && raise "Must declare starting times for spindown experiments."
-  echo "Running spindown experiment $mode from days ${tspindown[@]} for $tend days, restart every $days days."
+  echo "Running spindown experiment $mode from days ${tspindown[@]} for $tend days, restart every $rdays days."
   t0=$(date +%s)
   # Iterate through starting days
   for eday in "${tspindown[@]}"; do
     cday=0 # current day relative to start of equilibrium
-    nday=$days # next day, relative to start
+    nday=$rdays # next day, relative to start
     prefix=$expdir/d$(printf "%04d" $eday) # for successive spindown runs
-    fstart=$expdir/d$(printf "%04d" $((eday - days)))-d$(printf "%04d" $eday) # for restart files from control
+    fstart=$expdir/d$(printf "%04d" $((eday - rdays)))-d$(printf "%04d" $eday) # for restart files from control
     ts=$(date +%s) # record time
     echo "Starting radiation-off spindown run from day $eday for $tend days."
     while [ $nday -le $tend ]; do
@@ -446,8 +464,8 @@ else
       if [ $cday -lt $tstart ]; then
         echo "Skipping day $cday."
         pday=$cday # previous day
-        cday=$((pday + days))
-        nday=$((cday + days))
+        cday=$((pday + rdays))
+        nday=$((cday + rdays))
         continue
       fi
       # Get directories
@@ -466,8 +484,8 @@ else
       fi
       # Step things forward, for next iteration
       pday=$cday # previous day
-      cday=$((pday + days))
-      nday=$((cday + days))
+      cday=$((pday + rdays))
+      nday=$((cday + rdays))
     done
     echo "Spindown from $eday completed successfully in $(($(date +%s) - ts)) seconds!"
     echo "Timestamp: $(date)."

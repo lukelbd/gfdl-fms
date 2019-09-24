@@ -247,11 +247,12 @@ dir_setup() {
     if compgen -G "$wdir/../netcdf/*${wdir##*/}.nc" &>/dev/null; then
       echo "Found ${wdir##*/} files in 'netcdf' folder. Skipping..."
       return 1 # breaks out of if statement
+    else
+      # Otherwise, resume run and delete 'unfinished' contents
+      echo "Did not find ${wdir##*/} files in 'netcdf' folder. Resuming..."
+      resume=false
+      rm -rf $wdir
     fi
-    # Otherwise, resume run and delete 'unfinished' contents
-    echo "Did not find ${wdir##*/} files in 'netcdf' folder. Resuming..."
-    resume=false
-    rm -rf $wdir
   else
     # Overwrite
     echo "Working directory ${wdir##*/} already exists. Deleting..."
@@ -401,8 +402,8 @@ if [ $mode -eq 0 ]; then
     time=$(date +%s)
     # Run the model and combine output
     # Optionally use the end of other control runs to reduce spinup time
-    rdir=$expdir/d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
-    cdir=$expdir/d$(printf "%04d" $cday)-d$(printf "%04d" $nday)
+    rdir=$expdir/d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
+    cdir=$expdir/d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
     if [ -n "$rinit" ]; then
       coldstart=false
       [ -d $rinit ] || raise "Override restart directory \"$rinit\" does not exist."
@@ -451,8 +452,8 @@ else
   for eday in "${tspindown[@]}"; do
     cday=0 # current day relative to start of equilibrium
     nday=$rdays # next day, relative to start
-    prefix=$expdir/d$(printf "%04d" $eday) # for successive spindown runs
-    fstart=$expdir/d$(printf "%04d" $((eday - rdays)))-d$(printf "%04d" $eday) # for restart files from control
+    prefix=$expdir/d$(printf "%05d" $eday) # for successive spindown runs
+    fstart=$expdir/d$(printf "%05d" $((eday - rdays)))-d$(printf "%05d" $eday) # for restart files from control
     ts=$(date +%s) # record time
     echo "Starting radiation-off spindown run from day $eday for $tend days."
     while [ $nday -le $tend ]; do
@@ -465,9 +466,9 @@ else
         continue
       fi
       # Get directories
-      cdir=$prefix-spindown$mode-d$(printf "%04d" $cday)-d$(printf "%04d" $nday)
+      cdir=$prefix-spindown$mode-d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
       [ $cday -eq 0 ] && rdir=$fstart || \
-        rdir=$prefix-spindown$mode-d$(printf "%04d" $pday)-d$(printf "%04d" $cday)
+        rdir=$prefix-spindown$mode-d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
       # Run the model and combine output
       unset pflags
       if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then

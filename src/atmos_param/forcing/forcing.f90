@@ -68,7 +68,7 @@ real :: lat_ref = 0
 real :: q0_tropical = 0.0, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11 ! upper troposphere is default
 real :: q0_vortex = 0.0, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14          ! lower stratosphere is default
 real :: q0_arctic = 0.0, x0_arctic = 1.57, y0_arctic = 1.0
-real :: q0_global = 0.0, q0_surface = 0.0
+real :: q0_global = 0.0, q0_surface = 0.0, q0_realistic = 0.0
 real :: q0_lsp = 0.0, m_lsp = 1.0, p0_lsp = 800.0, pt_lsp = 200.0, lat0_lsp = 45.0, slat_lsp = 10.0
 real :: trflux = 1.e-5 ! surface flux for optional tracer
 real :: trsink = -4.   ! damping time for tracer
@@ -96,7 +96,7 @@ namelist /forcing_nml/  no_forcing, locked_heating, conserve_energy, &
   ktrop, kbl, kstrat, kmeso, kfric, ksponge, &
   trflux, trsink, &
   q0_lsp, m_lsp, p0_lsp, pt_lsp, lat0_lsp, slat_lsp, &
-  q0_tropical, q0_vortex, q0_arctic, q0_global, q0_surface, &
+  q0_tropical, q0_vortex, q0_arctic, q0_global, q0_surface, q0_realistic, &
   x0_tropical, y0_tropical, sx_tropical, sy_tropical, &
   x0_vortex, y0_vortex, sx_vortex, sy_vortex, &
   x0_arctic, y0_arctic
@@ -161,7 +161,7 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
     ps = p_half(:,:,size(p_half,3))
   endif
   do k=1,size(p_full,3)
-    sigma(:,:,k) = p_full(:,:,k)/ps
+    sigma(:,:,k) = p_full(:,:,k) / ps
   enddo
 
   !     Rayleigh damping of wind components near the surface
@@ -216,12 +216,12 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
     ! Apply tempreature tendency due to kinetic energy dissipation
     udt_diss = sum(udt_damp,4)
     vdt_diss = sum(vdt_damp,4)
-    tdt_diss = -((um + 0.5*udt_diss*dt)*udt_diss + (vm + 0.5*vdt_diss*dt)*vdt_diss)/cp_air
+    tdt_diss = -((um + 0.5 * udt_diss * dt) * udt_diss + (vm + 0.5 * vdt_diss * dt) * vdt_diss) / cp_air
     ! Diagnostic output
     if (id_tdt_diss  > 0) used = send_data(id_tdt_diss, tdt_diss, Time, is, js)
     if (id_heat_diss > 0) then
       pmass = p_half(:,:,2:) - p_half(:,:,:size(p_half,3)-1)
-      diss_heat = cp_air/grav * sum(tdt_diss*pmass, 3)
+      diss_heat = cp_air / grav * sum(tdt_diss * pmass, 3)
       used = send_data(id_heat_diss, diss_heat, Time, is, js)
     endif
   endif
@@ -234,7 +234,10 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
   if (q0_global .ne. 0) then ! global constant heating
     tdt_force = tdt_force + q0_global / seconds_per_day
   endif
-  if (q0_surface .ne. 0) then ! reaches maximum strength at surface, decays to zero at boundary layer
+  if (q0_realistic .ne. 0) then ! heating that mimics equilibrium surface temp change ! where (teq > t_strat)
+    tdt_force = tdt_force + q0_realistic * ((p_full / 100000.0) ** kappa) / seconds_per_day
+  endif
+  if (q0_surface .ne. 0) then ! maximum strength at surface then decays to zero at boundary layer
     where (sigma > sigma_b)
       tdt_force = tdt_force + q0_surface * ((sigma - sigma_b) / (1 - sigma_b)) / seconds_per_day
     endwhere
@@ -270,14 +273,14 @@ subroutine forcing ( is, ie, js, je, dt, Time, lon, lat, p_half, p_full, z_full,
           if (parse(params, 'sink', value) == 1) sink = value
         endif
       endif
-      rst = rm(:,:,:,n) + dt*rdt(:,:,:,n)
+      rst = rm(:,:,:,n) + dt * rdt(:,:,:,n)
       call tracer_source_sink ( flux, sink, p_half, rst, rtnd, kbot )
       rdt(:,:,:,n) = rdt(:,:,:,n) + rtnd
     enddo
   else if (num_tracers == 0 .and. size(rdt,4) == 1) then ! allow this as a getaround for a problem with the solo fv model
     flux = trflux
     sink = trsink
-    rst = rm(:,:,:,1) + dt*rdt(:,:,:,1)
+    rst = rm(:,:,:,1) + dt * rdt(:,:,:,1)
     call tracer_source_sink ( flux, sink, p_half, rst, rtnd, kbot )
     rdt(:,:,:,1) = rdt(:,:,:,1) + rtnd
   else
@@ -380,46 +383,46 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   !     ----- For tracers -----
 
   trdamp = 0.0
-  if (trsink < 0) trsink = -seconds_per_day*trsink
-  if (trsink > 0) trdamp = 1.0/trsink
+  if (trsink < 0) trsink = -seconds_per_day * trsink
+  if (trsink > 0) trdamp = 1.0 / trsink
 
   !     ----- Apply defaults -----
 
-  if (kbl(1)==fill_value)     kbl(1)     = -4.
-  if (ktrop(1)==fill_value)   ktrop(1)   = -40.
-  if (kstrat(1)==fill_value)  kstrat(1)  = -20.
-  if (kmeso(1)==fill_value)   kmeso(1)   = -1.
-  if (kfric(1)==fill_value)   kfric(1)   = -1.
-  if (ksponge(1)==fill_value) ksponge(1) = -2.
+  if (kbl(1) == fill_value)     kbl(1)     = -4.
+  if (ktrop(1) == fill_value)   ktrop(1)   = -40.
+  if (kstrat(1) == fill_value)  kstrat(1)  = -20.
+  if (kmeso(1) == fill_value)   kmeso(1)   = -1.
+  if (kfric(1) == fill_value)   kfric(1)   = -1.
+  if (ksponge(1) == fill_value) ksponge(1) = -2.
 
   !     ----- If one number specified in namelist, use it for *both* components -----
 
-  if (kbl(2)==fill_value) then
+  if (kbl(2) == fill_value) then
     kbl(2) = kbl(1)
   else
     ndamp_decomp = .true.
   end if
-  if (ktrop(2)==fill_value) then
+  if (ktrop(2) == fill_value) then
     ktrop(2) = ktrop(1)
   else
     ndamp_decomp = .true.
   end if
-  if (kstrat(2)==fill_value) then
+  if (kstrat(2) == fill_value) then
     kstrat(2) = kstrat(1)
   else
     ndamp_decomp = .true.
   end if
-  if (kmeso(2)==fill_value) then
+  if (kmeso(2) == fill_value) then
     kmeso(2) = kmeso(1)
   else
     ndamp_decomp = .true.
   end if
-  if (kfric(2)==fill_value) then
+  if (kfric(2) == fill_value) then
     kfric(2) = kfric(1)
   else
     rdamp_decomp = .true.
   end if
-  if (ksponge(2)==fill_value) then
+  if (ksponge(2) == fill_value) then
     ksponge(2) = ksponge(1)
   else
     sponge_decomp = .true.
@@ -435,19 +438,19 @@ subroutine forcing_init ( axes, is, ie, js, je, num_levels, Time )
   tkmeso   = 0.0
   do c=1,2
     ! Convert timescales from days to seconds
-    if (kbl(c)     < 0) kbl(c)     = -seconds_per_day*kbl(c)
-    if (ktrop(c)   < 0) ktrop(c)   = -seconds_per_day*ktrop(c)
-    if (kfric(c)   < 0) kfric(c)   = -seconds_per_day*kfric(c)
-    if (ksponge(c) < 0) ksponge(c) = -seconds_per_day*ksponge(c)
-    if (kstrat(c)  < 0) kstrat(c)  = -seconds_per_day*kstrat(c)
-    if (kmeso(c)   < 0) kmeso(c)   = -seconds_per_day*kmeso(c)
+    if (kbl(c)     < 0) kbl(c)     = -seconds_per_day * kbl(c)
+    if (ktrop(c)   < 0) ktrop(c)   = -seconds_per_day * ktrop(c)
+    if (kfric(c)   < 0) kfric(c)   = -seconds_per_day * kfric(c)
+    if (ksponge(c) < 0) ksponge(c) = -seconds_per_day * ksponge(c)
+    if (kstrat(c)  < 0) kstrat(c)  = -seconds_per_day * kstrat(c)
+    if (kmeso(c)   < 0) kmeso(c)   = -seconds_per_day * kmeso(c)
     ! Get coefficients from timescales
-    if (kbl(c)     > 0) tkbl(c)     = 1.0/kbl(c)
-    if (ktrop(c)   > 0) tktrop(c)   = 1.0/ktrop(c)
-    if (kfric(c)   > 0) vkfric(c)   = 1.0/kfric(c)
-    if (ksponge(c) > 0) vksponge(c) = 1.0/ksponge(c)
-    if (kstrat(c)  > 0) tkstrat(c)  = 1.0/kstrat(c)
-    if (kmeso(c)   > 0) tkmeso(c)   = 1.0/kmeso(c)
+    if (kbl(c)     > 0) tkbl(c)     = 1.0 / kbl(c)
+    if (ktrop(c)   > 0) tktrop(c)   = 1.0 / ktrop(c)
+    if (kfric(c)   > 0) vkfric(c)   = 1.0 / kfric(c)
+    if (ksponge(c) > 0) vksponge(c) = 1.0 / ksponge(c)
+    if (kstrat(c)  > 0) tkstrat(c)  = 1.0 / kstrat(c)
+    if (kmeso(c)   > 0) tkmeso(c)   = 1.0 / kmeso(c)
   enddo
 
   !     ----- Register diagnostic fields -----
@@ -602,48 +605,48 @@ integer :: i, j, k, c, seconds, days
 !-----------------------------------------------------------------------
 !     Constants
 ! Note that Lindgren et al 2018 (lsp) wrote sigma_phi = 0.175 * 360/2pi but that is only if latitudes are in degrees, not radians; here they are in radians!
-p0            = p_ref*100.0
-pfact         = p_logeval*100.0/p0
-lat_ref_r     = lat_ref*pi/180.0 ! latitude for retrieving reference tropopause height
-vtx_width_r   = vtx_width*pi/180.0
-vtx_edge_r    = vtx_edge*pi/180.0
+p0            = p_ref * 100.0
+pfact         = p_logeval * 100.0 / p0
+lat_ref_r     = lat_ref * pi / 180.0 ! latitude for retrieving reference tropopause height
+vtx_width_r   = vtx_width * pi / 180.0
+vtx_edge_r    = vtx_edge * pi / 180.0
 
 !-----------------------------------------------------------------------
 !     Surface temp and damping
-lat_vfact = cos(lat)**2 ! for use later on
-lat_vfact_ref = cos(lat_ref_r)**2
+lat_vfact = cos(lat) ** 2 ! for use later on
+lat_vfact_ref = cos(lat_ref_r) ** 2
 if (exp_h .ge. 0) then
   ! Poleward shift or default configuration
-  lat_hfact = sin(lat)**(2 + exp_h)
-  lat_hfact_ref = sin(lat_ref_r)**(2 + exp_h)
+  lat_hfact = sin(lat) ** (2 + exp_h)
+  lat_hfact_ref = sin(lat_ref_r) ** (2 + exp_h)
 else
   ! Equatorward shift
-  lat_hfact = 1 - cos(lat)**(2 - exp_h)
-  lat_hfact_ref = 1 - cos(lat_ref_r)**(2 - exp_h)
+  lat_hfact = 1 - cos(lat) ** (2 - exp_h)
+  lat_hfact_ref = 1 - cos(lat_ref_r) ** (2 - exp_h)
 endif
 ! Surface damping
 do c=1,2
-  tksurf_decomp(:,:,c) = (tkbl(c)-tktrop(c))*cos(lat)**exp_b
+  tksurf_decomp(:,:,c) = (tkbl(c) - tktrop(c)) * cos(lat) ** exp_b
 enddo
 
 !-----------------------------------------------------------------------
 !     Use HS94 surface, or special Schneider version?
-! NOTE: Schneider just uses int(cosx * (t0 + delh*(1/3 - sin(lat)^2))), ensures
+! NOTE: Schneider just uses int(cosx * (t0 + delh * (1/3 - sin(lat)^2))), ensures
 ! average due to the sine term cancels with the offset term. Easy to do for
 ! exp_h > 1, hard for cosine version. We don't try to make a general form.
 if (surf_schneider) then
-  t_surf = t_mean + delh*(1.0/3.0 - lat_hfact) - eps*sin(lat)
-  t_surf_ref = t_mean + delh*(1.0/3.0 - lat_hfact_ref) - eps*sin(lat_ref_r)
+  t_surf = t_mean + delh * (1.0 / 3.0 - lat_hfact) - eps * sin(lat)
+  t_surf_ref = t_mean + delh * (1.0 / 3.0 - lat_hfact_ref) - eps * sin(lat_ref_r)
 else
-  t_surf = t_zero - delh*lat_hfact - eps*sin(lat)
-  t_surf_ref = t_zero - delh*lat_hfact_ref - eps*sin(lat_ref_r)
+  t_surf = t_zero - delh * lat_hfact - eps * sin(lat)
+  t_surf_ref = t_zero - delh * lat_hfact_ref - eps * sin(lat_ref_r)
 endif
 
 !-----------------------------------------------------------------------
 !     Vortex weighting
 w_vtx = 0.0 ! standard atmosphere everywhere
 if (strat_vtx) then
-  w_vtx = 0.5*(1.0 + tanh((lat - abs(vtx_edge_r))/vtx_width_r)) ! vortex in northern hemisphere
+  w_vtx = 0.5 * (1.0 + tanh((lat - abs(vtx_edge_r)) / vtx_width_r)) ! vortex in northern hemisphere
 endif
 
 !-----------------------------------------------------------------------
@@ -661,13 +664,13 @@ if (trim(teq_mode) .eq. 'pk') then
 else if (trim(teq_mode) .eq. 'pkmod') then
   ! In PKMOD atmosphere, polar vortex begins right at the tropopause, and
   ! stratospheric warming begins at 20km at reference latitude
-  p_trop = p0*( t_strat / (t_surf - delv*log(pfact)*lat_vfact) )**(1.0/kappa)
-  p_trop_ref = p0*( t_strat / (t_surf_ref - delv*log(pfact)*lat_vfact_ref) )**(1.0/kappa)
-  z_vortex = -H*log(p_trop/p0)
-  z_offset = (z_vortex + H*log(p_trop_ref/p0)) + (z_ozone - 20.0) ! includes offset to accomodate configurable standard atmosphere height
-  ! print *, p_trop(0,size(t,2)/8), p_trop(0,size(t,2)/4), p_trop(0,size(t,2)/2)
-  ! print *, z_vortex(0,size(t,2)/8), z_vortex(0,size(t,2)/4), z_vortex(0,size(t,2)/2), z_vortex_ref
-  ! print *, z_offset(0,size(t,2)/8), z_offset(0,size(t,2)/4), z_offset(0,size(t,2)/2)
+  p_trop = p0 * ( t_strat / (t_surf - delv * log(pfact) * lat_vfact) ) ** (1.0 / kappa)
+  p_trop_ref = p0 * ( t_strat / (t_surf_ref - delv * log(pfact) * lat_vfact_ref) ) ** (1.0 / kappa)
+  z_vortex = -H * log(p_trop / p0)
+  z_offset = (z_vortex + H * log(p_trop_ref / p0)) + (z_ozone - 20.0) ! includes offset to accomodate configurable standard atmosphere height
+  ! print *, p_trop(0,size(t,2) / 8), p_trop(0,size(t,2) / 4), p_trop(0,size(t,2) / 2)
+  ! print *, z_vortex(0,size(t,2) / 8), z_vortex(0,size(t,2) / 4), z_vortex(0,size(t,2) / 2), z_vortex_ref
+  ! print *, z_offset(0,size(t,2) / 8), z_offset(0,size(t,2) / 4), z_offset(0,size(t,2) / 2)
 endif
 
 ! Loop through pressure
@@ -680,15 +683,15 @@ do k=1,size(t,3)
   ! WARNING: In assignment e.g. a = max(a, 0), end up with float NaNs
   ! when fortran tried to assign the scalar. Some weird fortran thing.
   ! We need two variables for this kind of statement!
-  z_norm = z_full(:,:,k)/1000. ! from m to km
-  p_norm = p_full(:,:,k)/p0
-  t_hs   = (t_surf - delv*log(p_norm)*lat_vfact) * (p_norm)**kappa
+  z_norm = z_full(:,:,k) / 1000. ! from m to km
+  p_norm = p_full(:,:,k) / p0
+  t_hs   = (t_surf - delv * log(p_norm) * lat_vfact) * (p_norm) ** kappa
   if (trim(teq_mode) == 'hs') then
     teq(:,:,k) = max( t_hs, t_strat )
   else
     call tstd_summer( t_strat, z_offset, z_norm, t_summer )
     call tstd_winter( t_strat, vtx_gamma, z_vortex, z_norm, t_winter )
-    t_pk = (1.0 - w_vtx)*t_summer + (w_vtx)*t_winter
+    t_pk = (1.0 - w_vtx) * t_summer + w_vtx * t_winter
     where (z_norm >= z_vortex)
       teq(:,:,k) = max( t_pk, t_min )
     elsewhere
@@ -704,10 +707,10 @@ do k=1,size(t,3)
     !
     !-----------------------------------------------------------------------
     ! Alternatively use smooth version below: see Holton-Mass model, 1976 (Journal of Atmospheric Sciences)
-    ! tkhi = tkstrat + (1.0 + tanh((z_norm-35.0)/7.0))*(tkmeso-tkstrat)/2.0
+    ! tkhi = tkstrat + (1.0 + tanh((z_norm-35.0) / 7.0)) * (tkmeso-tkstrat) / 2.0
     if (trim(damp_mode) == 'hs') then
       where (sigma(:,:,k) > sigma_b)
-        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c)*(sigma(:,:,k) - sigma_b)/(1.0-sigma_b)
+        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c) * (sigma(:,:,k) - sigma_b) / (1.0 - sigma_b)
       elsewhere
         tdamp(:,:,k,c) = tktrop(c)
       endwhere
@@ -716,14 +719,14 @@ do k=1,size(t,3)
         tkhi_decomp(:,:,c) = tkstrat(c)
       else
         tkhi_decomp(:,:,c) = min(tkmeso(c), &
-          tkstrat(c) + (tkmeso(c) - tkstrat(c))*(z_norm - z_vortex - z_kdepth)/(50 - z_vortex - z_kdepth))
+          tkstrat(c) + (tkmeso(c) - tkstrat(c)) * (z_norm - z_vortex - z_kdepth) / (50 - z_vortex - z_kdepth))
       endif
       where (sigma(:,:,k) > sigma_b)
-        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
+        tdamp(:,:,k,c) = tktrop(c) + tksurf_decomp(:,:,c) * (sigma(:,:,k) - sigma_b) / (1.0 - sigma_b)
       elsewhere (z_norm < z_vortex) ! below tropopause, not some fixed height
         tdamp(:,:,k,c) = tktrop(c)
       elsewhere (z_norm >= z_vortex .and. z_norm < z_vortex + z_kdepth)
-        tdamp(:,:,k,c) = tktrop(c) - (tktrop(c) - tkstrat(c))*(z_norm - z_vortex)/z_kdepth
+        tdamp(:,:,k,c) = tktrop(c) - (tktrop(c) - tkstrat(c)) * (z_norm - z_vortex) / z_kdepth
       elsewhere
         tdamp(:,:,k,c) = tkhi_decomp(:,:,c)
       endwhere
@@ -737,21 +740,21 @@ do k=1,size(t,3)
     !-----------------------------------------------------------------------
     if (.not. ndamp_decomp) then
       ! Damp the *full* temperature and exit
-      tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t(:,:,k) - teq(:,:,k))
+      tdt(:,:,k,1) = -tdamp(:,:,k,1) * (t(:,:,k) - teq(:,:,k))
       tdt(:,:,k,2) = 0.0
       tdamp(:,:,k,2) = tdamp(:,:,k,1)
       exit ! i.e. break from top-level do loop
     else if (c==1) then
       ! Damp the mean component
-      t_bar = sum(t(:,:,k), 1)/size(t, 1) ! mean
+      t_bar = sum(t(:,:,k), 1) / size(t, 1) ! mean
       do i=1,size(t,1)
         t_decomp(i,:,1) = t_bar
       enddo
-      tdt(:,:,k,1) = -tdamp(:,:,k,1)*(t_decomp(:,:,1) - teq(:,:,k))
+      tdt(:,:,k,1) = -tdamp(:,:,k,1) * (t_decomp(:,:,1) - teq(:,:,k))
     else if (c==2) then
       ! Damp the anomalous component
       t_decomp(:,:,2) = t(:,:,k) - t_decomp(:,:,1) ! anomaly relative to mean
-      tdt(:,:,k,2) = -tdamp(:,:,k,2)*t_decomp(:,:,2)
+      tdt(:,:,k,2) = -tdamp(:,:,k,2) * t_decomp(:,:,2)
     endif
   enddo
 enddo
@@ -785,21 +788,21 @@ subroutine tstd_summer ( t_tp, z_off, z_km, teq )
   ! See: https://en.wikipedia.org/wiki/Barometric_formula#Source_code
   ! We truncate the lowest and highest legs -- no tropospheric lapse rate, and no
   ! secondary mesospheric lapse rate (because never need to model that high)
-  t_1 = t_tp + 1.0*(32.0 - 20.0)           ! beginning of +2.8K lapse rate
-  t_sp = t_1 + 2.8*(47.0 - 32.0 + z_extra) ! stratopause temperature
-  t_2 = t_sp - 2.8*(71.0 - 51.0)           ! end of -2.8K lapse rate
+  t_1 = t_tp + 1.0 * (32.0 - 20.0)           ! beginning of +2.8K lapse rate
+  t_sp = t_1 + 2.8 * (47.0 - 32.0 + z_extra) ! stratopause temperature
+  t_2 = t_sp - 2.8 * (71.0 - 51.0)           ! end of -2.8K lapse rate
   where (z_coord <= 20) ! maybe has to be array here? try it out
     teq = t_tp
   elsewhere (z_coord <= 32) ! lapse rate 1K for 12km
-    teq = t_tp + 1.0*(z_coord - 20)
+    teq = t_tp + 1.0 * (z_coord - 20)
   elsewhere (z_coord <= 47 + z_extra)
-    teq = t_1 + 2.8*(z_coord - 32)
+    teq = t_1 + 2.8 * (z_coord - 32)
   elsewhere (z_coord <= 51 + z_extra)
     teq = t_sp
   elsewhere (z_coord <= 71 + z_extra)
-    teq = t_sp - 2.8*(z_coord - 51 - z_extra)
+    teq = t_sp - 2.8 * (z_coord - 51 - z_extra)
   elsewhere
-    teq = t_2 - 2.0*(z_coord - 71 - z_extra)
+    teq = t_2 - 2.0 * (z_coord - 71 - z_extra)
   endwhere
 
 end subroutine tstd_summer
@@ -820,32 +823,32 @@ subroutine tstd_winter ( t_tp, vtx_gamma, z_vortex, z_km, teq )
   where (z_km <= z_vortex)
     teq = t_tp
   elsewhere
-    teq = t_tp - vtx_gamma*(z_km - z_vortex)
+    teq = t_tp - vtx_gamma * (z_km - z_vortex)
   endwhere
 
   ! Previous version with calculation done in pressure coords
-  ! p_pkswitch = p0*exp(-z_ozone/H)
-  ! t_vtx = t_strat_usstd*(p_full(:,:,k)/p_pkswitch)**pexp
+  ! p_pkswitch = p0 * exp(-z_ozone / H)
+  ! t_vtx = t_strat_usstd * (p_full(:,:,k) / p_pkswitch) ** pexp
 
   ! Previous version with US standard atmosphere-like transition zones
   ! z_offset     = (t_min - 216.65) / 2.8
   ! if (z_offset > 4) then
   !   call error_mesg ('forcing', 'Minimum stratosphere temperature too warm', FATAL)
   ! end if
-  ! t_1 = t_min - vtx_gamma*(32 - z_tp_ref)
-  ! z_vtx_recover = z_offset + (t_sp - t_1)/2.8
+  ! t_1 = t_min - vtx_gamma * (32 - z_tp_ref)
+  ! z_vtx_recover = z_offset + (t_sp - t_1) / 2.8
   ! where (z_coord <= z_vortex)
   !   teq = t_min
   ! elsewhere (z_coord <= 32 + z_offset) ! lapse rate 1K for 12km
-  !   teq = t_min - vtx_gamma*(z_coord - (z_tp_ref + z_offset))
+  !   teq = t_min - vtx_gamma * (z_coord - (z_tp_ref + z_offset))
   ! elsewhere (z_coord <= 36 + z_offset)
   !   teq = t_1
   ! elsewhere (z_coord <= 36 + z_vtx_recover)
-  !   teq = t_1 + 2.8*(z_coord - (36 + z_offset))
+  !   teq = t_1 + 2.8 * (z_coord - (36 + z_offset))
   ! elsewhere (z_coord <= 36 + z_vtx_recover + 4)
   !   teq = t_sp
   ! elsewhere
-  !   teq = t_sp - 2.8*(z_coord - (36 + z_vtx_recover + 4))
+  !   teq = t_sp - 2.8 * (z_coord - (36 + z_vtx_recover + 4))
   ! endwhere
 
 end subroutine tstd_winter
@@ -867,17 +870,17 @@ subroutine butler_heating ( x, y, tdt )
   do k = 1, size(tdt,3)
     !     ----- Tropical forcing, mimics lapse rate feedback -----
     if (q0_tropical .ne. 0) then
-      tdt(:,:,k) = tdt(:,:,k) + q0_tropical*exp( &
-         -((x(:,:)   - x0_tropical)**2/(2*sx_tropical**2) + &
-           (y(:,:,k) - y0_tropical)**2/(2*sy_tropical**2)) &
+      tdt(:,:,k) = tdt(:,:,k) + q0_tropical * exp( &
+         -((x(:,:)   - x0_tropical) ** 2 / (2 * sx_tropical ** 2) + &
+           (y(:,:,k) - y0_tropical) ** 2 / (2 * sy_tropical ** 2)) &
            ) / seconds_per_day
     endif
 
     !     ----- Polar vortex forcing, mimics ozone depletion -----
     if (q0_vortex .ne. 0) then
-      tdt(:,:,k) = tdt(:,:,k) + q0_vortex*exp( &
-        -2*((x(:,:)   - x0_vortex)**2/(2*sx_vortex**2) + &
-            (y(:,:,k) - y0_vortex)**2/(2*sy_vortex**2)) &
+      tdt(:,:,k) = tdt(:,:,k) + q0_vortex * exp( &
+        -2 * ((x(:,:)   - x0_vortex) ** 2 / (2 * sx_vortex ** 2) + &
+            (y(:,:,k) - y0_vortex) ** 2 / (2 * sy_vortex ** 2)) &
             ) / seconds_per_day
     endif
 
@@ -886,7 +889,7 @@ subroutine butler_heating ( x, y, tdt )
     if (q0_arctic .ne. 0) then
       where (x .gt. 0)
         tdt(:,:,k) = tdt(:,:,k) + q0_arctic &
-          * cos(x - x0_arctic)**15 * exp(6*(y(:,:,k) - y0_arctic)) &
+          * cos(x - x0_arctic) ** 15 * exp(6 * (y(:,:,k) - y0_arctic)) &
           / seconds_per_day
       endwhere
     endif
@@ -910,14 +913,16 @@ subroutine lsp_heating ( lon, lat, p_full, tdt )
   ! Note model longitudes and latitudes are in radians!
   integer :: k
 
-  phi0_lsp = lat0_lsp * pi/180.0 ! latitude at which localised heating is centred
-  sphi_lsp = slat_lsp * pi/180.0 ! 0.175 radians default, presumably related to the width of heating in latitude (standard deviation in Gaussian distribution)
-  pbot = p0_lsp*100.0
-  ptop = pt_lsp*100.0
+  phi0_lsp = lat0_lsp * pi / 180.0 ! latitude at which localised heating is centred
+  sphi_lsp = slat_lsp * pi / 180.0 ! 0.175 radians default, presumably related to the width of heating in latitude (standard deviation in Gaussian distribution)
+  pbot = p0_lsp * 100.0
+  ptop = pt_lsp * 100.0
   do k=1,size(tdt,3)
     where ((p_full(:,:,k) <= pbot) .and. (p_full(:,:,k) >= ptop))
       tdt(:,:,k) = tdt(:,:,k) + &
-        q0_lsp * sin(m_lsp*lon(:,:))*exp(-0.5*((lat - phi0_lsp)/sphi_lsp)**2)*sin(pi*log(p_full(:,:,k)/pbot)/log(ptop/pbot)) &
+        q0_lsp * sin(m_lsp * lon(:,:)) &
+        * exp(-0.5 * ((lat - phi0_lsp) / sphi_lsp) ** 2) &
+        * sin(pi * log(p_full(:,:,k) / pbot) / log(ptop / pbot)) &
         / seconds_per_day
     endwhere 
   enddo
@@ -944,7 +949,7 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
     do c=1,2
       !    ---- Determine damping coeffs ----
       where (sigma(:,:,k) <= 1.0 .and. sigma(:,:,k) > sigma_b)
-        rdamp(:,:,k,c) = vkfric(c)*(sigma(:,:,k) - sigma_b)/(1.0 - sigma_b)
+        rdamp(:,:,k,c) = vkfric(c) * (sigma(:,:,k) - sigma_b) / (1.0 - sigma_b)
       elsewhere
         rdamp(:,:,k,c) = 0.0
       endwhere
@@ -952,8 +957,8 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
       !    ---- Apply damping ----
       if (.not. rdamp_decomp) then
         ! Damp the total winds, then exit
-        udt(:,:,k,1)    = -rdamp(:,:,k,1)*u(:,:,k)
-        vdt(:,:,k,1)    = -rdamp(:,:,k,1)*v(:,:,k)
+        udt(:,:,k,1)    = -rdamp(:,:,k,1) * u(:,:,k)
+        vdt(:,:,k,1)    = -rdamp(:,:,k,1) * v(:,:,k)
         udt(:,:,k,2)    = 0.0
         vdt(:,:,k,2)    = 0.0
         rdamp(:,:,k,2) = rdamp(:,:,k,1)
@@ -961,20 +966,20 @@ subroutine friction_damping ( sigma, u, v, udt, vdt, rdamp, mask )
         exit ! i.e. break from top-level do loop
       else if (c==1) then
         ! Damp the means
-        u_mean = sum(u(:,:,k),1)/size(u,1) ! mean
-        v_mean = sum(v(:,:,k),1)/size(v,1)
+        u_mean = sum(u(:,:,k),1) / size(u,1) ! mean
+        v_mean = sum(v(:,:,k),1) / size(v,1)
         do i=1,size(u,1)
           u_decomp(i,:,1) = u_mean
           v_decomp(i,:,1) = v_mean
         enddo
-        udt(:,:,k,1)    = -rdamp(:,:,k,1)*u_decomp(:,:,1)
-        vdt(:,:,k,1)    = -rdamp(:,:,k,1)*v_decomp(:,:,1)
+        udt(:,:,k,1)    = -rdamp(:,:,k,1) * u_decomp(:,:,1)
+        vdt(:,:,k,1)    = -rdamp(:,:,k,1) * v_decomp(:,:,1)
       else if (c==2) then
         ! Damp the anomaly
         u_decomp(:,:,2) = u(:,:,k) - u_decomp(:,:,1) ! anomaly
         v_decomp(:,:,2) = v(:,:,k) - v_decomp(:,:,1)
-        udt(:,:,k,2)    = -rdamp(:,:,k,2)*u_decomp(:,:,2)
-        vdt(:,:,k,2)    = -rdamp(:,:,k,2)*v_decomp(:,:,2)
+        udt(:,:,k,2)    = -rdamp(:,:,k,2) * u_decomp(:,:,2)
+        vdt(:,:,k,2)    = -rdamp(:,:,k,2) * v_decomp(:,:,2)
       endif
     enddo
   enddo
@@ -1009,10 +1014,10 @@ subroutine sponge_damping ( p_full, u, v, uspg, vspg, sdamp, mask )
 
   do k = 1, size(u,3)
     where (p_full(:,:,k) .lt. p_sp)
-      sp_fact = (p_sp - p_full(:,:,k))/p_sp
-      spcoeff = ksp*sp_fact*sp_fact
-      uspg(:,:,k)  = spcoeff*u(:,:,k) 
-      vspg(:,:,k)  = spcoeff*v(:,:,k)
+      sp_fact = (p_sp - p_full(:,:,k)) / p_sp
+      spcoeff = ksp * sp_fact * sp_fact
+      uspg(:,:,k)  = spcoeff * u(:,:,k) 
+      vspg(:,:,k)  = spcoeff * v(:,:,k)
       sdamp(:,:,k) = spcoeff
     elsewhere
       uspg(:,:,k)  = 0.0
@@ -1046,8 +1051,8 @@ subroutine tracer_source_sink ( flux, damp, p_half, r, rdt, kbot )
   !-----------------------------------------------------------------------
 
   rdamp = damp
-  if (rdamp < 0.) rdamp = -seconds_per_day*rdamp   ! convert days to seconds
-  if (rdamp > 0.) rdamp = 1.0/rdamp
+  if (rdamp < 0.) rdamp = -seconds_per_day * rdamp   ! convert days to seconds
+  if (rdamp > 0.) rdamp = 1.0 / rdamp
 
   source=0.0
   if (present(kbot)) then
@@ -1055,16 +1060,16 @@ subroutine tracer_source_sink ( flux, damp, p_half, r, rdt, kbot )
       do i=1,size(r,1)
         kb = kbot(i,j)
         pmass (i,j)    = p_half(i,j,kb+1) - p_half(i,j,kb)
-        source(i,j,kb) = flux/pmass(i,j)
+        source(i,j,kb) = flux / pmass(i,j)
       enddo
     enddo
   else
     kb = size(r,3)
     pmass     = p_half(:,:,kb+1) - p_half(:,:,kb)
-    source(:,:,kb) = flux/pmass
+    source(:,:,kb) = flux / pmass
   endif
 
-  sink = rdamp*r
+  sink = rdamp * r
   rdt = source-sink
 
 end subroutine tracer_source_sink

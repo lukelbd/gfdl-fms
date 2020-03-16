@@ -96,6 +96,7 @@
   q0_arctic       = 0.0,        ! amplitude for Butler Arctic surface heating
   q0_global       = 0.0,        ! globally uniform heating
   q0_surface      = 0.0,        ! average strength of boundary layer heating, that decays linearly from surface to top of boundary layer
+  q0_realistic    = 0.0,        ! strength of 'realistically' vertically scaled heating at 1000hPa
   q0_lsp          = 0.0,        ! intensity of lsp forcing
   m_lsp           = 1.0,        ! next lines are LSP heating terms
   p0_lsp          = 800.0,

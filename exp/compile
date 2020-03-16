@@ -18,15 +18,17 @@ Options
 # Move to this script's directory
 cwd=$(readlink -f ${0})
 cwd=${cwd%/*}
-cd $cwd
+cd $cwd || raise "Failed to move to ${cwd}."
 source header.sh
+
 # Universal flags
+# export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
+export PATH="/opt/pgi/linux86-64/18.10/bin:$PATH"
 root=$cwd/../
 cppdefs='-Duse_libMPI -Duse_netCDF'
 ncflags='-lnetcdff -lnetcdf -lhdf5 -lhdf5_hl'
 optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but GFDL default was O3 so maybe not; https://stackoverflow.com/a/19985801/4970632
-export PATH="/opt/pgi/linux86-64/18.10/bin:$PATH"
-# export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path
+
 # Host-specific settings
 # Cheyenne uses a compiler wrapper mpif90 that handles all mpi flags,
 # so use mpif90/mpiifort (identical) instead of ifort
@@ -76,21 +78,24 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ -z "$model" ] && raise "Must specify model name."
+
 # Files
-mkmf=$root/bin/mkmf                            # path to executable mkmf
-mkmftemplate=$root/bin/mkmf.template           # template of most basic settings
-mppnsource=$root/postprocessing/mppnccombine.c # source code
+mkmf=$root/bin/mkmf                             # path to executable mkmf
+mkmftemplate=$root/bin/mkmf.template            # template of most basic settings
+mppnsource=$root/postprocessing/mppnccombine.c  # source code
 [ -d bin ] || mkdir bin
-cd bin # move to source directory
+cd bin || raise "Failed to move to bin."
 [ -r $mppnsource ]   || raise "Could not find mppnccombine source code."
 [ -r $mkmftemplate ] || raise "Could not find Makefile template."
 [ -r $mkmf ]         || raise "Could not find Makefile-generating utility $mkmf."
+which $cpp &>/dev/null || raise "Compiler $cpp not found in \$PATH."
 
 # Create mppnccombine
 # NOTE: Don't compile with mpi support, just runs it a bunch of times
 t0=$(date +%s)
-echo "Generating mppnccombine executable..."
-$cpp -O -o mppnccombine.x -L$lib -I$include $ncflags $mppnsource
+echo "Compiling mppnccombine..."
+$cpp -O -o mppnccombine.x -L$lib -I$include $ncflags $mppnsource \
+  || raise "Failed to compile mppnccombine.x."
 
 # Run make clean
 if $force && [ -r Makefile ]; then
@@ -111,13 +116,11 @@ cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
 
 # Create makefile
 $mkmf -p ${model}.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
-  $root/src/shared/mpp/include $root/src/shared/include ${include[@]} # the other include files
-[ $? -ne 0 ] && raise "Mppnccombine compilation failed."
+  $root/src/shared/mpp/include $root/src/shared/include ${include[@]} \
+  || raise "Failed to make Makefile."
 
 # Compile source
 echo "Compiling source code..."
-make -f Makefile
-[ $? -ne 0 ] && raise "Model compilation failed."
-cp *.x ../ 2>/dev/null
-echo "This script took $(($(date +%s) - $t0)) seconds."
-
+make -f Makefile || raise "Failed to compile ${model}.x."
+cp ./*.x ../ 2>/dev/null
+echo "This script took $(($(date +%s) - t0)) seconds."

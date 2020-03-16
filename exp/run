@@ -107,11 +107,13 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
       expdir="$1"
     else
       raise "This script requires exactly two positional arguments."
-    fi ;;
+    fi
+    ;;
   esac
   shift
 done
 [ -n "$gpflags" ] && echo "Passing these flags to processing script: $gpflags"
+
 # Errors and messages
 # export MPI_SHEPHERD=true # see: https://www2.cisl.ucar.edu/sites/default/files/intro_to_hpc.pdf
 # when mpiexec_mpt used, MPI_SHEPHERD required, but this failed for me
@@ -122,6 +124,7 @@ which $run &>/dev/null || raise "$run not found in \$PATH."
 [ -z "$expdir" ] && raise "You must declare the experiment directory."
 [ -x "${sdir}/${model}.x" ] || raise "Invalid model \"${model}\". The executable \"${sdir}/${model}.x\" is missing."
 model=$sdir/${model}.x
+
 # Default files and scripts
 nml=$(realpath $nml)
 diag=$(realpath $diag)
@@ -143,11 +146,12 @@ if [ -n "$tdt" ]; then
   tdt=$(realpath $tdt)
   [ -r "$tdt" ] || raise "Diabatic heating file \"$tdt\" not found or is not readable."
 fi
+
 # Namelist, diag table, field table
 # Restart directory
 if [ -n "$rinit" ] && ! [[ $rinit =~ d.*-d.* ]]; then
-  rinit=($rinit/d*-d*)
-  rinit="${rinit[-1]}"
+  ropts=($rinit/d*-d*)
+  rinit="${ropts[-1]}"
 fi
 
 # Make experiment directory
@@ -260,9 +264,8 @@ dir_setup() {
   fi
 
   # Make directory and move stuff over
-  mkdir $wdir
-  [ $? -ne 0 ] && raise "Failed to create working directory \"$wdir\"." && return 1
-  cd $wdir
+  mkdir $wdir || raise "Failed to create working directory \"$wdir\"."
+  cd $wdir || raise "Failed to move to working directory \"$wdir\"."
   cp $model . # move executable inside (declared at top of file)
   mkdir RESTART # model spits out stuff here, can be accepted as input to new iteration
   mkdir INPUT   # model reads from this
@@ -313,12 +316,11 @@ run_model() {
   cday=$1 # current day
   ncores=$2 # number of processors
   process=$3
-  t1=$(date +%s)
   echo "Running model..."
   $run -np $ncores ./${model##*/} &>model.log
   grep -E 'EXIT CODE: [1-9]|FATAL from PE|WARNING from PE' model.log &>/dev/null && \
     raise "Bad exit status from model run step. Check $(pwd)/model.log"
-  tmodel=$(cat model.log | grep "Total runtime*" | xargs | cut -d " " -f 5)
+  tmodel=$(cat model.log | grep 'Total runtime.*' | xargs | cut -d ' ' -f 5)
   [ -z "$tmodel" ] && raise "Logfile model.log not found or is empty."
   echo "Model time: ${tmodel%.*}s." # is just max of the two
 
@@ -340,15 +342,14 @@ run_model() {
 }
 
 ################################################################################
-# Run model for a second to get the *unchanging* params, i.e. zsurf, teq,
-# kdamp, kfric, and ksponge.
+# Run model for a second to get various *unchanging* params
 ################################################################################
 # Set up directory
 [ -d $expdir/constants ] || mkdir $expdir/constants
 dir_setup 0 $expdir/constants
 nml_replace $expdir/constants/input.nml dt_atmos 1 days 0 hours 0 minutes 0 seconds 1
 cat >$expdir/constants/diag_table <<EOF
-"Constant and initial state for dry core experiments"
+"Constants and initial state for dry core experiments"
 0 0 0 0 0 0
 # Filename
 "constants", 1, "seconds", 1, "days", "time",
@@ -369,6 +370,7 @@ cat >$expdir/constants/diag_table <<EOF
 "forcing",  "rdamp_mean", "rdamp_mean", "constants", "all", .false., "none", 2,
 "forcing",  "rdamp_anom", "rdamp_anom", "constants", "all", .false., "none", 2,
 EOF
+
 # Run model
 echo "Getting forcing data..."
 run_model 0 1 $pinit || raise "Forcing run failed. Check log files in the forcing folder."
@@ -379,7 +381,6 @@ $init && exit 0
 # Run the model in blocks of $rdays days for control, then optionally choose
 # starting points from control for spin-down ensemble experiments
 ##############################################################################
-estatus=0
 if [ $mode -eq 0 ]; then
   # Prepare for the loop
   echo "Running control experiment from day $tstart to day $tend on $cores cores, restart every $rdays days."
@@ -399,7 +400,6 @@ if [ $mode -eq 0 ]; then
       continue
     fi
     echo "Running from day $cday to day $nday."
-    time=$(date +%s)
     # Run the model and combine output
     # Optionally use the end of other control runs to reduce spinup time
     rdir=$expdir/d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
@@ -415,26 +415,29 @@ if [ $mode -eq 0 ]; then
     if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
       pflags=" -k" && echo "Full resolution netcdf files will be kept."
     fi
-    dir_setup $cday $cdir # sets up working directory, cd into it
-    if [ $? -eq 0 ]; then # setup returns 1 if directory is present and 'resume' option is set
+    dir_setup $cday $cdir && {
+      # dir_setup fails if directory is present and 'resume' is set
       if ! $coldstart || [ $cday -gt 0 ]; then
         copy_restart $cday $rdir # put files into RESTART directory
       else
         echo "Cold start."
       fi
       run_model $cday $cores $pinline
-    fi
-    [ $rdays -eq 0 ] && break # exit for initial condition experiment
+    }
+
     # Step things forward, for next iteration
+    [ $rdays -eq 0 ] && break  # exit for initial condition experiment
     pday=$cday
     cday=$((pday + rdays))
     nday=$((cday + rdays))
   done
+
   # Last file
   if [ -r process.log ]; then
     tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Final process time: ${tprocess%.*}s."
   fi
+
   # Message
   echo "The control run completed successfully in $(($(date +%s) - t0)) seconds!"
   echo "Timestamp: $(date)."
@@ -445,9 +448,10 @@ if [ $mode -eq 0 ]; then
 ##############################################################################
 else
   # Prepare for the loop
-  [ -z $tspindown ] && raise "Must declare starting times for spindown experiments."
-  echo "Running spindown experiment $mode from days ${tspindown[@]} for $tend days, restart every $rdays days."
+  [ ${#tspindown[@]} -eq 0 ] && raise "Must declare starting times for spindown experiments."
+  echo "Running spindown experiment $mode from days ${tspindown[*]} for $tend days, restart every $rdays days."
   t0=$(date +%s)
+
   # Iterate through starting days
   for eday in "${tspindown[@]}"; do
     cday=0 # current day relative to start of equilibrium
@@ -465,20 +469,23 @@ else
         nday=$((cday + rdays))
         continue
       fi
+
       # Get directories
       cdir=$prefix-spindown$mode-d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
       [ $cday -eq 0 ] && rdir=$fstart || \
         rdir=$prefix-spindown$mode-d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
+
       # Run the model and combine output
       unset pflags
       if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
         pflags=" -k" && echo "Full resolution netcdf files will be kept."
       fi
-      dir_setup $cday $cdir # sets up working directory, cd into it
-      if [ $? == 0 ]; then # returns 1 if we were requested not to overwrite old directories
+      dir_setup $cday $cdir && {
+        # dir_setup fails if directory is present and 'resume' is set
         copy_restart $cday $rdir
         run_model $cday $cores $pinline
-      fi
+      }
+
       # Step things forward, for next iteration
       pday=$cday # previous day
       cday=$((pday + rdays))
@@ -487,10 +494,14 @@ else
     echo "Spindown from $eday completed successfully in $(($(date +%s) - ts)) seconds!"
     echo "Timestamp: $(date)."
   done
+
+  # Last file
   if [ -r process.log ]; then
     tprocess=$(tail -1 process.log | sed 's/[^0-9]*//g')
     echo "Final process time: ${tprocess%.*}s."
   fi
+
+  # Message
   echo "The spindown runs completed successfuly in $(($(date +%s) - t0)) seconds!"
   echo "Timestamp: $(date)."
 fi

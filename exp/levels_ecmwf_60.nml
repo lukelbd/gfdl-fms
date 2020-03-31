@@ -1,9 +1,5 @@
 ! These are the ERA-Interim and ERA40 levels from file "ecmwf-L60.txt" in Gauss home
 ! Maybe better way to do this; parse the file automatically instead of in VIM manually
-!  * See http://vim.wikia.com/wiki/Generating_a_column_of_increasing_numbers (command not available)
-!    and http://vim.wikia.com/wiki/Making_a_list_of_numbers (this one worked on this older version)
-!  * Even though file says pk() should be w.r.t. a reference pressure P00, model still runs
-!    normally inputting the pressure in Pa; so this is correct, don't worry
 &vert_coordinate_nml
     pk(1)=0.000000,       bk(1)=0.000000,
     pk(2)=20.000000,      bk(2)=0.000000,

@@ -216,15 +216,17 @@ copy_restart() {
   for file in $rdir/RESTART/*; do
     cp $file INPUT/${file##*/}
   done
+  printf "Restart directory:\n%s\n" "$rdir/RESTART" > restart.log
+
   # Enforce starting time
-  # WARNING: After day 10000, 'days' field runs into 'month' field in atmos_model.res
-  # which causes weird error with 1 timestep in output NetCDF files and data corruption
-  # Editing namelist does not work because current time overwritten by the
-  # INPUT/atmos_model.res file. Need to edit the latter.
+  # WARNING: After day 10000, 'days' field runs into 'month' field in
+  # atmos_model.res which causes weird error with 1 timestep in output NetCDF
+  # files and data corruption Editing namelist does not work because current
+  # time overwritten by the INPUT/atmos_model.res file. Need to edit latter.
   if [ $cday -eq 0 ]; then
     sed -i 's/ \+/ /g;s/[0-9]*[1-9][0-9]*/0/g' INPUT/atmos_model.res
     cp $rdir/input.nml ../restart.nml # store the restart namelist in root directory for experiment
-    echo ${rdir} >../restart.log
+    printf "Restart directory:\n%s\n" "$rdir/RESTART" >../restart.log
   fi
 }
 
@@ -390,46 +392,42 @@ if [ $mode -eq 0 ]; then
   cday=0
   nday=$rdays
   while [ $nday -le $tend ]; do
-    # Message and reset timer/flags
-    if [ $cday -lt $tstart ]; then
-      [ -n "$rinit" ] && echo "Ignoring restart directory ${rinit}."
-      unset rinit # important! for 'resume' experiments, generally just want to use rinit as cold start alternative
-      pday=$cday # previous day
-      cday=$((pday + rdays))
-      nday=$((cday + rdays))
-      continue
-    fi
-    echo "Running from day $cday to day $nday."
-    # Run the model and combine output
-    # Optionally use the end of other control runs to reduce spinup time
-    rdir=$expdir/d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
-    cdir=$expdir/d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
-    if [ -n "$rinit" ]; then
-      coldstart=false
-      [ -d $rinit ] || raise "Override restart directory \"$rinit\" does not exist."
-      echo "Using restart files from \"$rinit\"."
-      rdir="$rinit" # use specific day sequence
-      unset rinit # only ever use this on first 'day' of a new experiment; for subsequent days, continue from earlier day block
-    fi
-    unset pflags
-    if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
-      pflags=" -k" && echo "Full resolution netcdf files will be kept."
-    fi
-    dir_setup $cday $cdir && {
-      # dir_setup fails if directory is present and 'resume' is set
-      if ! $coldstart || [ $cday -gt 0 ]; then
-        copy_restart $cday $rdir # put files into RESTART directory
-      else
-        echo "Cold start."
+    if [ $cday -ge $tstart ]; then
+      # Use override restart directory
+      echo "Running from day $cday to day $nday."
+      rdir=$expdir/d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
+      cdir=$expdir/d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
+      if [ -n "$rinit" ]; then
+        coldstart=false
+        [ -d $rinit ] || raise "Override restart directory \"$rinit\" does not exist."
+        echo "Using restart files from \"$rinit\"."
+        rdir="$rinit" # use specific day sequence
       fi
-      run_model $cday $cores $pinline
-    }
+
+      # Run the model and combine output
+      # dir_setup fails if directory is present and 'resume' is set
+      dir_setup $cday $cdir && {
+        unset pflags
+        if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
+          pflags='-k' && echo "Full resolution netcdf files will be kept."
+        fi
+        if ! $coldstart || [ $cday -gt 0 ]; then
+          copy_restart $cday $rdir # put files into RESTART directory
+        else
+          echo "Cold start."
+        fi
+        run_model $cday $cores $pinline
+      }
+    fi
 
     # Step things forward, for next iteration
+    # NOTE: For now, disallow restarting from other experiment in middle of run
     [ $rdays -eq 0 ] && break  # exit for initial condition experiment
-    pday=$cday
+    [ -n "$rinit" ] && echo "Ignoring restart directory ${rinit}."
+    pday=$cday # previous day
     cday=$((pday + rdays))
     nday=$((cday + rdays))
+    unset rinit # important! for 'resume' experiments, generally just want to use rinit as cold start alternative
   done
 
   # Last file
@@ -461,30 +459,24 @@ else
     ts=$(date +%s) # record time
     echo "Starting radiation-off spindown run from day $eday for $tend days."
     while [ $nday -le $tend ]; do
-      # Skip this time (optionally)
-      if [ $cday -lt $tstart ]; then
-        echo "Skipping day $cday."
-        pday=$cday # previous day
-        cday=$((pday + rdays))
-        nday=$((cday + rdays))
-        continue
-      fi
+      if [ $cday -ge $tstart ]; then
+        # Directory setup
+        cdir=$prefix-spindown$mode-d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
+        [ $cday -eq 0 ] \
+          && rdir=$fstart \
+          || rdir=$prefix-spindown$mode-d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
 
-      # Get directories
-      cdir=$prefix-spindown$mode-d$(printf "%05d" $cday)-d$(printf "%05d" $nday)
-      [ $cday -eq 0 ] && rdir=$fstart || \
-        rdir=$prefix-spindown$mode-d$(printf "%05d" $pday)-d$(printf "%05d" $cday)
-
-      # Run the model and combine output
-      unset pflags
-      if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
-        pflags=" -k" && echo "Full resolution netcdf files will be kept."
-      fi
-      dir_setup $cday $cdir && {
+        # Run the model and combine output
         # dir_setup fails if directory is present and 'resume' is set
-        copy_restart $cday $rdir
-        run_model $cday $cores $pinline
-      }
+        dir_setup $cday $cdir && {
+          unset pflags
+          if [ $cday -lt $ktstart ] || [ $cday -gt $ktend ]; then
+            pflags=" -k" && echo "Full resolution netcdf files will be kept."
+          fi
+          copy_restart $cday $rdir
+          run_model $cday $cores $pinline
+        }
+      fi
 
       # Step things forward, for next iteration
       pday=$cday # previous day

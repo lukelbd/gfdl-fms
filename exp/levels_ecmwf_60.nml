@@ -1,5 +1,4 @@
-! These are the ERA-Interim and ERA40 levels from file "ecmwf-L60.txt" in Gauss home
-! Maybe better way to do this; parse the file automatically instead of in VIM manually
+! ERA-Interim and ERA-40 levels from levels/ecmwf-L60.txt
 &vert_coordinate_nml
     pk(1)=0.000000,       bk(1)=0.000000,
     pk(2)=20.000000,      bk(2)=0.000000,

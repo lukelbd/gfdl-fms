@@ -115,6 +115,7 @@ DELIM
 cat $mkmftemplate >> mkmf.template # appends provided template to custom defs
 
 # Create makefile
+echo "Making Makefile..."
 $mkmf -p ${model}.x -t mkmf.template -c "$cppdefs" -a $root $pathnames \
   $root/src/shared/mpp/include $root/src/shared/include ${include[@]} \
   || raise "Failed to make Makefile."

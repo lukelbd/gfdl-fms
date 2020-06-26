@@ -5,23 +5,23 @@
 # the time axis (i.e. no comments above these lines!).
 
 # Next lines indicate filenames with 6 comma-separated values
-# 1) file name
-# 2) save-frequency: -1==at end of run, 0==every timestep, >0==units
-# 3) save-frequency units: one of "years", "months", "days", "minutes", "hours", "seconds"
-# 4) file format: 1==NetCDF, the only supported format
-# 5) time axis dimension units: one of "days", "minutes", "hours", "seconds"
-# 6) time axis dimension name
+# 1. file name
+# 2. save-frequency: -1==at end of run, 0==every timestep, >0==units
+# 3. save-frequency units: one of "years", "months", "days", "minutes", "hours", "seconds"
+# 4. file format: 1==NetCDF, the only supported format
+# 5. time axis dimension units: one of "days", "minutes", "hours", "seconds"
+# 6. time axis dimension name
 "file", 12, "hours", 1, "days", "time",
 
 # Next lines indicate variables to save with 8 comma-separated values
-# 1) name of module that can export this variable: e.g. "dynamics" or "forcing"
-# 2) module variable name
-# 3) variable name once saved in NetCDF file
-# 4) file name
-# 5) time-sampling freq for averages: currently only supports averaging over *all* timesteps of the run
-# 6) whether we take time average: if .true., the corresponding file output freq should be -1
-# 7) other options: not implemented, use the dummy string "none"
-# 8) save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
+# 1. name of module that can export this variable: e.g. "dynamics" or "forcing"
+# 2. module variable name
+# 3. variable name once saved in NetCDF file
+# 4. file name
+# 5. time-sampling freq for averages: currently only supports averaging over *all* timesteps of the run
+# 6. whether we take time average: if .true., the corresponding file output freq should be -1
+# 7. other options: not implemented, use the dummy string "none"
+# 8. save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
 # Note cannot save time-average data in same file as non-time-average data
 # If you accidentally try to output two vars w/ same name, get silent failure
 "dynamics", "bk",    "hybi",  "file", "all", .false., "none", 2,

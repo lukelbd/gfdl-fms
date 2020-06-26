@@ -1,5 +1,5 @@
 "Model results from the Held-Suarez benchmark"
-0 0 0 0 0 0
+1 1 1 0 0 0
 # Diagnostic table, describes how model data is saved to NetCDF files
 # First two lines *must* contain the experiment name, and the base time for
 # the time axis (i.e. no comments above these lines!).

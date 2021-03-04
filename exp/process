@@ -14,10 +14,9 @@ mppnccombine=${rdir}/mppnccombine.x # netcdf combine executable
 t0=$(date +%s)
 prefixes=(*.nc.0000)
 if [ ${#prefixes[@]} -eq 0 ]; then
-  parallel=false
   prefixes=(*.nc) # already present?
   [ ${#prefixes[@]} -eq 0 ] && raise "Model output files not found." # make sure nullglob turned off
-  echo "Note: Model ran on only 1 core, do not need to merge files."
+  echo "Model ran on only 1 core, do not need to merge files."
   exit 0
 fi
 
@@ -30,7 +29,7 @@ for prefix in ${prefixes[@]}; do
   done
   # Merge
   ncfiles=(${base}.*.nc)
-  echo "Combining files: ${ncfiles[@]} into ${base}.nc"
+  echo "Combining files: ${ncfiles[*]} into ${base}.nc"
   [ -d ../netcdf ] || mkdir ../netcdf # make directory if doesn't exist
   $mppnccombine -r ${base}.nc ${ncfiles[@]} # -r flag says to remove the decomposed .0000 files after they are combined
   [ $? -ne 0 ] && raise "mppnccombine failed."

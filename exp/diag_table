@@ -1,5 +1,5 @@
 "Model results from the Held-Suarez benchmark"
-1 1 1 0 0 0
+0 0 0 0 0 0
 # Diagnostic table, describes how model data is saved to NetCDF files
 # First two lines *must* contain the experiment name, and the base time for
 # the time axis (i.e. no comments above these lines!).
@@ -11,7 +11,7 @@
 # 4. file format: 1==NetCDF, the only supported format
 # 5. time axis dimension units: one of "days", "minutes", "hours", "seconds"
 # 6. time axis dimension name
-"file", 12, "hours", 1, "days", "time",
+"data", 12, "hours", 1, "days", "time",
 
 # Next lines indicate variables to save with 8 comma-separated values
 # 1. name of module that can export this variable: e.g. "dynamics" or "forcing"
@@ -24,17 +24,17 @@
 # 8. save dtype: 1 is 64-bit, 2 is 32-bit, 3 is 16-bit
 # Note cannot save time-average data in same file as non-time-average data
 # If you accidentally try to output two vars w/ same name, get silent failure
-"dynamics", "bk",     "hybi",  "file", "all", .false., "none", 2,
-"dynamics", "pk",     "hyai",  "file", "all", .false., "none", 2,
-"dynamics", "slp",    "slp",   "file", "all", .false., "none", 2,
-"dynamics", "temp",   "t",     "file", "all", .false., "none", 2,
-"dynamics", "ucomp",  "u",     "file", "all", .false., "none", 2,
-"dynamics", "vcomp",  "v",     "file", "all", .false., "none", 2,
-"dynamics", "omega",  "omega", "file", "all", .false., "none", 2,
-"dynamics", "height", "z",     "file", "all", .false., "none", 2,
-"forcing",  "tdt",    "tdt",   "file", "all", .false., "none", 2,
-"forcing",  "udt",    "udt",   "file", "all", .false., "none", 2,
-"forcing",  "vdt",    "vdt",   "file", "all", .false., "none", 2,
+"dynamics", "bk",     "hybi",  "data", "all", .false., "none", 2,
+"dynamics", "pk",     "hyai",  "data", "all", .false., "none", 2,
+"dynamics", "slp",    "slp",   "data", "all", .false., "none", 2,
+"dynamics", "temp",   "t",     "data", "all", .false., "none", 2,
+"dynamics", "ucomp",  "u",     "data", "all", .false., "none", 2,
+"dynamics", "vcomp",  "v",     "data", "all", .false., "none", 2,
+"dynamics", "omega",  "omega", "data", "all", .false., "none", 2,
+"dynamics", "height", "z",     "data", "all", .false., "none", 2,
+"forcing",  "tdt",    "tdt",   "data", "all", .false., "none", 2,
+"forcing",  "udt",    "udt",   "data", "all", .false., "none", 2,
+"forcing",  "vdt",    "vdt",   "data", "all", .false., "none", 2,
 # Derivable dynamics params. To save space just calculate vor from wind,
 # z from hypsometric equation, and archive the above params.
 # Mean and anomaly forcing components

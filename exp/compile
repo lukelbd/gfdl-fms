@@ -36,29 +36,34 @@ optimization='-O3' # O2 or O3? more optimization can actually be *slower*, but G
 # See: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/running-jobs/intel-mpi-and-open-mpi
 case ${HOSTNAME%%.*} in
   cheyenne*)
-    module load intel &>/dev/null
     module load netcdf &>/dev/null
+    module load intel &>/dev/null
     module load impi &>/dev/null
     lib=$NETCDF/lib
     include=$NETCDF/include
     fortran=mpiifort
     cpp=mpiicc
     ldflags='-qopenmp' # see: https://www2.cisl.ucar.edu/resources/computational-systems/cheyenne/code-development-support/compiling-code
-  ;; monde) # where code is compiled
+  ;;
+  monde) # where code is compiled
     lib=/usr/lib64/mpich/lib
     include=/usr/include/mpich-x86_64
     fortran=pgf90
     cpp=pgcc
     fpflags='-Ktrap=fp' # see: http://www.dartmouth.edu/~rc/HPC/man/pgf90.html
     ldflags='-Mmpi=mpich'
-  ;; euclid) # everything is bunched together
+  ;;
+  euclid) # everything is bunched together
     include=/usr/local/include
     lib=/usr/local/lib
     fortran=pgf90
     cpp=pgcc
     fpflags='-Ktrap=fp'
     ldflags='-Mmpi=mpich'
-  ;; *) raise "Unknown host, must configure library and binary locations before running." ;;
+  ;;
+  *)
+    raise "Unknown host, must configure library and binary locations before running."
+  ;;
 esac
 
 # Parse input

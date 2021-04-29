@@ -35,9 +35,10 @@ longitudes as well as latitudes.
   Held and Suarez (1994): the Polvani and Kushner (2002) `'pk'` scheme
   (`teq_mode='pk'`), and a *modified* Polvani and Kushner scheme (`teq_mode='pkmod'`),
   with stratospheric equilibrium temperatures conforming to the height at which the
-  stratospheric equilibrium temperature is reached. It also includes an option to change
-  the damping timescale in the stratosphere (`damp_mode='pk'` or `damp_mode='pkmod'`),
-  beginning where the stratospheric equilibrium temp is reached.
+  minimum tropospheric equilibrium temperature is reached. It also includes an option
+  to change the damping timescale in the stratosphere (`damp_mode='pk'` or
+  `damp_mode='pkmod'`), beginning where the minimum tropospheric equilibrium
+  temperature is reached.
 * [forcing.f90](src/atmos_param/forcing/forcing.f90) adds various options for modifying
   the damping scheme: specifying surface equilibrium temperature from its global mean
   surface value rather than its equatorial surface value (`surf_shneider=.true.` and

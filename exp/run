@@ -79,12 +79,12 @@ Other arguments
 # Initial stuff
 # export MPI_SHEPHERD=true # see: https://www2.cisl.ucar.edu/sites/default/files/intro_to_hpc.pdf
 # when mpiexec_mpt used, MPI_SHEPHERD required, but this failed for me
-sdir=$(readlink -f ${0})
+sdir=$(readlink -f $0)
 sdir=${sdir%/*}
-run=mpirun # for running in parallel
 source $sdir/header.sh
 shopt -u nullglob
 ulimit -s unlimited
+run=mpirun # for running in parallel
 which realpath &>/dev/null || raise "This script requires the 'realpath' command. 'realpath' not found."
 which $run &>/dev/null || raise "$run not found in \$PATH."
 case ${HOSTNAME%%.*} in

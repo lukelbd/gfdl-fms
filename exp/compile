@@ -19,7 +19,7 @@ Options
 cwd=$(readlink -f ${0})
 cwd=${cwd%/*}
 cd $cwd || raise "Failed to move to ${cwd}."
-source header.sh
+source $cwd/header.sh
 
 # Universal flags
 # export PATH="/usr/lib64/mpich/bin:$PATH" # add mpi executable to path

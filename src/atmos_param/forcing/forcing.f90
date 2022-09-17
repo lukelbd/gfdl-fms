@@ -49,29 +49,29 @@ public :: forcing, forcing_init
 
 !-----------------------------------------------------------------------
 !     ----- Namelist -----
-real, parameter :: H = 7.0 ! for calculation below
+real, parameter :: H = 7.0  ! for calculation below
 character(len=64) :: teq_mode = 'hs', damp_mode = 'hs', strat_damp = 'constant'
 logical :: no_forcing = .false.
 logical :: conserve_energy = .true.
 logical :: strat_sponge = .true., strat_vtx = .true.
-logical :: surf_schneider = .false. ! HS94 or Schneider surface temp?
+logical :: surf_schneider = .false.  ! HS94 or Schneider surface temp?
 logical :: locked_heating = .false., ndamp_decomp = .false., rdamp_decomp = .false., sponge_decomp = .false.
-integer :: exp_b = 4 ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
-integer :: exp_h = 0 ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
+integer :: exp_b = 4  ! exponent in cosine for boundary layer; Schneider uses 8, Held-Suarez 4
+integer :: exp_h = 0  ! exponent describing deflection from default meridional gradient sin^2(lat) = 1 - cos^(lat)
 real :: sigma_b  = 0.7
 real :: t_zero = 315.0, t_mean = 300.0, t_strat = 200.0, t_min = 100.0
 real :: delh = 60.0, delv = 10.0, eps = 0.0
 real :: vtx_edge = 50.0, vtx_width = 10.0, vtx_gamma = 2.0
 real :: p_ref = 1000.0, p_sponge = 0.5, p_logeval = 200.0
-real :: z_ozone = 20.0, z_kdepth = 50.0 ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
+real :: z_ozone = 20.0, z_kdepth = 50.0  ! pkswitch at 16km evaluates to roughly 100mb with scale height 7km
 real :: lat_ref = 0
-real :: q0_tropical = 0.0, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11 ! upper troposphere is default
-real :: q0_vortex = 0.0, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14          ! lower stratosphere is default
+real :: q0_tropical = 0.0, x0_tropical = 0.0, y0_tropical = 0.3, sx_tropical = 0.4, sy_tropical = 0.11  ! upper troposphere is default
+real :: q0_vortex = 0.0, x0_vortex = 1.57, y0_vortex = 0.1, sx_vortex = 0.4, sy_vortex = 0.14  ! lower stratosphere is default
 real :: q0_arctic = 0.0, x0_arctic = 1.57, y0_arctic = 1.0
 real :: q0_global = 0.0, q0_surface = 0.0, q0_realistic = 0.0
 real :: q0_lsp = 0.0, m_lsp = 1.0, p0_lsp = 800.0, pt_lsp = 200.0, lat0_lsp = 45.0, slat_lsp = 10.0
-real :: trflux = 1.e-5 ! surface flux for optional tracer
-real :: trsink = -4.   ! damping time for tracer
+real :: trflux = 1.e-5  ! surface flux for optional tracer
+real :: trsink = -4.  ! damping time for tracer
 !     ----- Allocatable params -----
 ! This mimics how surf_geopot in spectral_dynamics is allocated during
 ! initialization.

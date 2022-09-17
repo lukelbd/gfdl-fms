@@ -19,6 +19,24 @@ calc() {
   bc -l <<< "$*" | awk '{printf "%.'$precision'f", $0}'
 }
 
+# Clean up namelist comments and empty lines
+nml_clean() {
+  local usage='nml_clean NML_FILE'
+  [ $# -ne 1 ] && raise "Invalid number of arguments."
+  [ -r "$1" ] || raise "Namelist '$1' not found"
+  sed -i 's/!.*$//g;/^[ \t]*$/d' "$1" # remove comments
+}
+
+# Print from the global namelist file
+nml_print() {
+  [ -r "$nml_file" ] || raise "Namelist '$nml_file' not found"
+  echo "Modified namelist: $nml_file"  # must be global variable!
+  nml_message+="$nml_names\n$nml_values\n"
+  printf "$nml_message"  # with literal newlines
+  unset nml_names nml_values nml_message
+  # printf '%s\n%s\n' "$nml_names" "$nml_values" | column -t
+}
+
 # Print namelist value
 nml_parse() {
   local usage value
@@ -58,26 +76,15 @@ nml_replace() {
   done
 }
 
-# Print from the global namelist file
-nml_print() {
-  [ -r "$nml_file" ] || raise "Namelist '$nml_file' not found"
-  echo "Modified namelist: $nml_file"  # must be global variable!
-  nml_message+="$nml_names\n$nml_values\n"
-  printf "$nml_message"
-  unset nml_names nml_values nml_message
-  # printf '%s\n%s\n' "$nml_names" "$nml_values" | column -t
-}
-
-# Clean up namelist comments and empty lines
-nml_clean() {
-  local usage='nml_clean NML_FILE'
+# Clean up diag_table comments and empty lines
+diag_clean() {
+  local usage='diag_clean DIAG_FILE'
   [ $# -ne 1 ] && raise "Invalid number of arguments."
-  [ -r "$1" ] || raise "Namelist '$1' not found"
-  sed -i 's/!.*$//g;/^[ \t]*$/d' "$1" # remove comments
+  [ -r "$1" ] || raise "Diag table '$1' not found"
+  sed -i 's/#.*$//g;/^[ \t]*$/d' "$1" # remove comments, empty lines, for clarity
 }
 
-# Add lines to diagnostic table
-# NOTE: Add backslashes to strings for awk printing
+# Add lines to diagnostic table (NOTE: add backslashes to strings for awk printing)
 diag_add() {
   local file_print vars_print
   local usage="diag_add DIAG_FILE 'FILENAME LINE' 'VARIABLE LINE 1' ['VARIABLE LINE 2' ...]"
@@ -104,12 +111,4 @@ diag_replace() {
   [ -n "$2" ] && sed -i "s/\"data\"/\"$2\"/g" "$1"
   [ -n "$3" ] && sed -i "s/12/$3/g" "$1"
   [ -n "$4" ] && sed -i "s/\"hours\"/\"$4\"/g" "$1"
-}
-
-# Clean up diag_table comments and empty lines
-diag_clean() {
-  local usage='diag_clean DIAG_FILE'
-  [ $# -ne 1 ] && raise "Invalid number of arguments."
-  [ -r "$1" ] || raise "Diag table '$1' not found"
-  sed -i 's/#.*$//g;/^[ \t]*$/d' "$1" # remove comments, empty lines, for clarity
 }

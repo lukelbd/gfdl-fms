@@ -49,9 +49,9 @@ Configuring the run
   -dt=*|--timestep=*    Timestep in seconds.
   -ts=*|--tstart=*      Initial integration day.
   -te=*|--tend=*        Final integration day.
-  -kts=*|--ktstart=*    Initial day for which full-res data is saved.
-  -kte=*|--ktend=*      Final day for which full-res data is saved.
-  -tsp=*|--tspindown=*  Comma-separated list of days for starting spindown runs.
+  -ks=*|--kstart=*      Initial day for which full-resolution data is kept.
+  -ke=*|--kend=*        Final day for which full-resolution data is kept.
+  -sp=*|--spindown=*    Comma-separated list of days for starting spindown runs.
 
 Input and processing
 
@@ -68,7 +68,7 @@ Input and processing
   -topo=*|--topography=*   Use this topography data for the experiment. Defaults to no
                            input topography. You must set topography_option='input' in
                            the namelist for this to be used.
-  -tdt=*|--heating=*       Use this heating data for the experiment. Defaults to no
+  -heat=*|--heating=*       Use this heating data for the experiment. Defaults to no
                            input heating. You must set locked_heating=.true. in the
                            namelist for this to be used.
 
@@ -111,8 +111,8 @@ irestart=false
 jrestart=false
 tstart=0
 tend=0
-ktstart=0
-ktend=100000
+kstart=0
+kend=100000
 nml=$sdir/input.nml
 diag=$sdir/diag_table
 field=$sdir/field_table
@@ -129,20 +129,20 @@ while [ $# -gt 0 ]; do # echo "Flag: $1"
     -c=*|--cores=*)          cores=${1#*=} ;;
     -d=*|--days=*)           days=${1#*=} ;;
     -ds=*|--days-save=*)     sdays=${1#*=} ;;
+    -rd=*|--restart=*)       rinit=${1#*=} ;;
     -dt=*|--timestep)        timestep=${1#*=} ;;
     -ts=*|--tstart=*)        tstart=${1#*=} ;;
     -te=*|--tend=*)          tend=${1#*=} ;;
-    -rd=*|--restart=*)       rinit=${1#*=} ;;
-    -kts=*|--ktstart=*)      ktstart=${1#*=} ;;
-    -kte=*|--ktend=*)        ktend=${1#*=} ;;
-    -tsp=*|--tspindown=*)    tspindown=${1#*=} ;;
+    -ks=*|--kstart=*)        kstart=${1#*=} ;;
+    -ke=*|--kend=*)          kend=${1#*=} ;;
+    -sp=*|--spindown=*)      spindown=${1#*=} ;;
     -p=*|--process=*)        pinline=${1#*=} ;;
     -pi=*|--process-init=*)  pinit=${1#*=} ;;
     -nml=*|--namelist=*)     nml=${1#*=} ;;
     -diag=*|--diagtable=*)   diag=${1#*=} ;;
     -field=*|--fieldtable=*) field=${1#*=} ;;
     -topo=*|--topography=*)  topo=${1#*=} ;;
-    -tdt=*|--heating=*)      tdt=${1#*=} ;;
+    -heat=*|--heating=*)     heat=${1#*=} ;;
     -*)                      gpflags+="$1 " ;;
     # Positional args
     *)
@@ -172,14 +172,14 @@ nml=$(realpath $nml)
 diag=$(realpath $diag)
 field=$(realpath $field)
 pinline=$(realpath $pinline)
-tdt=$(realpath $tdt 2>/dev/null)
+heat=$(realpath $heat 2>/dev/null)
 topo=$(realpath $topo 2>/dev/null)
 pinit=$(realpath $pinit 2>/dev/null)
 [ -r "$nml" ] || raise "Namelist file '$nml' not found or is not readable."
 [ -r "$diag" ] || raise "Diagnostic table file '$diag' not found or is not readable."
 [ -r "$field" ] || raise "Field table file '$field' not found or is not readable."
 [ -x "$pinline" ] || raise "Processing script '$pinline' not found or is not executable."
-[ -n "$tdt" ] && ! [ -r "$tdt" ] && raise "Diabatic heating file '$tdt' not found or is not readable."
+[ -n "$heat" ] && ! [ -r "$heat" ] && raise "Diabatic heating file '$heat' not found or is not readable."
 [ -n "$topo" ] && ! [ -r "$topo" ] && raise "Topography file '$topo' not found or is not readable."
 [ -n "$pinit" ] && ! [ -x "$pinit" ] && raise "Initial processing script '$pinit' not found or is not executable."
 [ -x "$model" ] || raise "Invalid model. The executable '$model' is missing."
@@ -189,7 +189,7 @@ pinit=$(realpath $pinit 2>/dev/null)
 cp $nml $expdir/input.nml 2>/dev/null
 cp $diag $expdir/diag_table 2>/dev/null
 cp $field $expdir/field_table 2>/dev/null
-[ -n "$tdt" ] && cp $tdt $expdir/heating.data.nc 2>/dev/null
+[ -n "$heat" ] && cp $heat $expdir/heating.data.nc 2>/dev/null
 [ -n "$topo" ] && cp $topo $expdir/topography.data.nc 2>/dev/null
 [ -n "$days" ] && nml_replace $expdir/input.nml days "$days"
 [ -n "$timestep" ] && nml_replace $expdir/input.nml dt_atmos "$timestep"
@@ -270,23 +270,23 @@ dir_setup() {
 
   # Input files
   heat=$(nml_parse input.nml locked_heating)
-  topo=$(nml_parse input.nml topography_option) # use helper function
-  if [ "$topo" == "input" ]; then
-    [ -r $expdir/topography.data.nc ] || raise "Topography file '$expdir/topography.data.nc' not found."
-    cp $expdir/topography.data.nc INPUT/
-  fi
+  topo=$(nml_parse input.nml topography_option)  # use helper function
   if [ "$heat" == ".true." ]; then
     [ -r $expdir/heating.data.nc ] || raise "Heating file '$expdir/heating.data.nc' not found."
     cp $expdir/heating.data.nc INPUT/
+  fi
+  if [ "$topo" == "input" ]; then
+    [ -r $expdir/topography.data.nc ] || raise "Topography file '$expdir/topography.data.nc' not found."
+    cp $expdir/topography.data.nc INPUT/
   fi
 
   # Namelist changes for spindown runs
   if [ $mode -gt 0 ]; then
     case $mode in   # determine spindown type
-      1) nml_replace input.nml ktrop 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all thermal damping
-      2) nml_replace input.nml ktrop 0 kstrat 0 kmeso 0 ;; # turn off damping except in boundary layer
-      3) nml_replace input.nml ktrop 0 kfric 0 kbl 0 kstrat 0 kmeso 0 ;; # turn off all damping
-      4) nml_replace input.nml kfric 0 ;; # turn off friction
+      1) nml_replace input.nml ktrop 0 kbl 0 kstrat 0 kmeso 0 ;;  # turn off all thermal damping
+      2) nml_replace input.nml ktrop 0 kstrat 0 kmeso 0 ;;  # turn off damping except in boundary layer
+      3) nml_replace input.nml ktrop 0 kfric 0 kbl 0 kstrat 0 kmeso 0 ;;  # turn off all damping
+      4) nml_replace input.nml kfric 0 ;;  # turn off friction
       *) raise "Unknown experiment identifier '$mode'." ;;
     esac
     nml_print
@@ -352,7 +352,7 @@ run_model() {
   # Process new data, and remove old data
   # Previously we set processor affinities, but didn't help much
   unset pflags
-  if [ $cday -ge $ktstart ] && [ $cday -lt $ktend ]; then
+  if [ $cday -ge $kstart ] && [ $cday -lt $kend ]; then
     pflags=' -k'
   else
     echo 'Will remove full resolution netcdf files.'
@@ -466,10 +466,10 @@ if [ $mode -eq 0 ]; then
 # Spindown experiments
 else
   # Iterate through starting days
-  tspindown=($(echo "$tspindown" | tr ',' ' '))
-  [ ${#tspindown[@]} -eq 0 ] && raise "Must declare starting times for spindown experiments."
-  echo "Running spindown experiment $mode from days ${tspindown[*]} for $tend days, restart every $days days."
-  for eday in "${tspindown[@]}"; do
+  spindown=($(echo "$spindown" | tr ',' ' '))
+  [ ${#spindown[@]} -eq 0 ] && raise "Must declare starting times for spindown experiments."
+  echo "Running spindown experiment $mode from days ${spindown[*]} for $tend days, restart every $days days."
+  for eday in "${spindown[@]}"; do
     # Set up loop
     icday=0 # current day relative to start of equilibrium
     ipday=0

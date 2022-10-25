@@ -109,8 +109,7 @@ The model can be given two types of input files in the `INPUT` directory.
 * Topography file `topography.data.nc`, containing a `zsurf` variable with longitude and
   latitude dimensions.
 * Locked heating file `heating.data.nc`, containing a `t` variable or `tdt` variable
-  with longitude, latitude, and level dimensions. This heating replaces the thermal
-  damping term.
+  with longitude, latitude, and level dimensions. This heating replaces thermal damping.
 
 Truncation
 ----------

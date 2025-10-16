@@ -24,7 +24,6 @@ character(len=128), parameter :: tagname = '$Name: latest $'
 contains
 
 !---------------------------------------------------------------------------------------------
-
 function mass_weighted_global_integral(field, surf_press)
 
 !  This function returns the mass weighted vertical integral of field,

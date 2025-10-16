@@ -175,7 +175,7 @@ namelist /spectral_dynamics_nml/ use_virtual_temperature, damping_option,       
                                  p_press, p_sigma, exponent, exp_pk, ocean_topog_smoothing, initial_sphum, &
                                  valid_range_t, eddy_sponge_coeff, zmu_sponge_coeff, zmv_sponge_coeff,     &
                                  print_interval, num_steps
-                                 
+
 contains
 
 !===============================================================================================
@@ -440,6 +440,7 @@ return
 end subroutine spectral_dynamics_init
 
 !===============================================================================================
+
 subroutine read_restart_or_do_coldstart(tracer_attributes, ocean_mask)
 
 ! For backward compatability, this routine has the capability
@@ -556,6 +557,7 @@ endif
 
 return
 end subroutine read_restart_or_do_coldstart
+
 !===============================================================================================
 
 subroutine allocate_fields
@@ -587,7 +589,9 @@ pk=0.; bk=0.; vorg=0.; divg=0.; surf_geopotential=0.; grid_tracers=0.
 
 return
 end subroutine allocate_fields
+
 !===============================================================================================
+
 subroutine check_dynamics_nml
 
 character(len=8)  :: ch_tmp1
@@ -678,7 +682,9 @@ endif
 return
 
 end subroutine check_dynamics_nml
+
 !===============================================================================================
+
 subroutine get_initial_fields(ug_out, vg_out, tg_out, psg_out, grid_tracers_out)
 real, intent(out), dimension(:,:,:)   :: ug_out, vg_out, tg_out
 real, intent(out), dimension(:,:)     :: psg_out
@@ -700,6 +706,7 @@ psg_out = psg(:,:,  1)
 grid_tracers_out = grid_tracers(:,:,:,1,:)
 
 end subroutine get_initial_fields
+
 !===============================================================================================
 
 subroutine spectral_dynamics(Time, psg_final, ug_final, vg_final, tg_final, tracer_attributes, grid_tracers_final, &
@@ -1146,7 +1153,9 @@ surf_geopotential_out = surf_geopotential
 
 return
 end subroutine get_surf_geopotential
+
 !================================================================================
+
 subroutine get_reference_sea_level_press(reference_sea_level_press_out)
 real, intent(out) :: reference_sea_level_press_out
 
@@ -1158,7 +1167,9 @@ reference_sea_level_press_out = reference_sea_level_press
 
 return
 end subroutine get_reference_sea_level_press
+
 !================================================================================
+
 subroutine get_use_virtual_temperature(use_virtual_temperature_out)
 logical, intent(out) :: use_virtual_temperature_out
 
@@ -1170,7 +1181,9 @@ use_virtual_temperature_out = use_virtual_temperature
 
 return
 end subroutine get_use_virtual_temperature
+
 !================================================================================
+
 subroutine get_num_levels(num_levels_out)
 integer, intent(out) :: num_levels_out
 
@@ -1182,7 +1195,9 @@ num_levels_out = num_levels
 
 return
 end subroutine get_num_levels
+
 !================================================================================
+
 subroutine get_pk_bk(pk_out, bk_out)
 real, intent(out), dimension(:) :: pk_out, bk_out
 character(len=32) :: chtmp='size(pk)=      size(bk)=        '
@@ -1201,7 +1216,9 @@ bk_out = bk
 
 return
 end subroutine get_pk_bk
+
 !================================================================================
+
 subroutine complete_update_of_future(psg_in, ug_in, vg_in, tg_in, tracer_attributes, grid_tracers_in)
 
 real,              intent(in), dimension(:,:    ) :: psg_in
@@ -1241,7 +1258,9 @@ enddo
 
 return
 end subroutine complete_update_of_future
+
 !================================================================================
+
 subroutine complete_robert_filter(tracer_attributes)
 type(tracer_type), intent(inout), dimension(:) :: tracer_attributes
 integer :: ntr
@@ -1270,6 +1289,7 @@ enddo
 
 return
 end subroutine complete_robert_filter
+
 !================================================================================
 
 subroutine spectral_dynamics_end(tracer_attributes, Time)
@@ -1332,7 +1352,9 @@ module_is_initialized = .false.
 
 return
 end subroutine spectral_dynamics_end
+
 !===================================================================================
+
 subroutine spectral_diagnostics_init(Time)
 
 type(time_type), intent(in) :: Time
@@ -1455,7 +1477,9 @@ enddo
 
 return
 end subroutine spectral_diagnostics_init
+
 !===================================================================================
+
 subroutine spectral_diagnostics(Time, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid, time_level)
 
 type(time_type), intent(in) :: Time
@@ -1549,7 +1573,9 @@ endif
 
 return
 end subroutine spectral_diagnostics
+
 !===================================================================================
+
 subroutine global_integrals(Time, Time_step, p_surf, u_grid, v_grid, t_grid, wg_full, tr_grid)
 type(time_type), intent(in) :: Time, Time_step
 real, intent(in), dimension(is:ie, js:je)                          :: p_surf
@@ -1586,7 +1612,9 @@ endif
 ! 400 format(' Stats',i6,i6,i6,f10.3,f10.3)
 
 end subroutine global_integrals
+
 !===================================================================================
+
 function get_axis_id()
 integer, dimension(4) :: get_axis_id
 
@@ -1596,7 +1624,9 @@ endif
 get_axis_id = axis_id
 return
 end function get_axis_id
+
 !===================================================================================
+
 subroutine spectral_diagnostics_end
 
 if(.not.module_is_initialized) return
@@ -1605,6 +1635,7 @@ deallocate(id_tr)
 
 return
 end subroutine spectral_diagnostics_end
+
 !===================================================================================
 
 end module spectral_dynamics_mod
